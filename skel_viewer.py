@@ -49,17 +49,9 @@ class Skel:
         r = self.row
         return [r[ii], r[ii + 1], -r[ii + 2]]
 
-    # def bone(self, index):
-    #     return [self.joint(index), self.joint(joint_tree[index]]    
-
     def bone(self, i):
-        ji = joint_tree[i]
-        # print("jt type = {}".format(type(ji)))
-        b = np.array([self.joint(i), self.joint(joint_tree[i])])
-        b = np.swapaxes(b, 0, -1)
-        # x, y, z = [j0[0], j1[0]], [j0[1], j1[1]], [j0[2], j1[2]]
-        # return [x, y, z]
-        return b
+        b = [self.joint(i), self.joint(joint_tree[i])]
+        return np.array(b).swapaxes(0, -1)
 
 
     
