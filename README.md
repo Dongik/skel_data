@@ -1,7 +1,8 @@
 
 # Insole to Skel data
 
-
+## Animate skeleton
+python skel_viewer.py -s skeleton_keep_walk.csv(default)
 
 ## Header Info
 
