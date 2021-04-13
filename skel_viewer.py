@@ -38,6 +38,26 @@ hflip_indices=[
 ]
 
 
+p_pos = [
+    (0.267, 0.832), # 0
+    (0.181, 0.880), # 1
+    (0.131, 0.886), # 2
+    (0.066, 0.881), # 3
+    (0.292, 0.655), # 4
+    (0.209, 0.680), # 5
+    (0.133, 0.689), # 6
+    (0.058, 0.705), # 7
+    (0.279, 0.554), # 8
+    (0.255, 0.389), # 12
+    (0.185, 0.438), # 13
+    (0.118, 0.463), # 14
+    (0.217, 0.242), # 17
+    (0.119, 0.251), # 18
+    (0.194, 0.079), # 21
+    (0.107, 0.094), # 22
+]
+
+
 
 class Skel:
     def __init__(self, row):
@@ -54,34 +74,7 @@ class Skel:
         return np.array(b).swapaxes(0, -1)
 
 
-    
-def Gen_RandLine(length, dims=2):
-    """
-                skels[i][j] = row[45 + i]
-    length is the number of points for the line.
-    dims is the number of dimensions the line has.
-    """
-    lineData = np.empty((dims, length))
-    lineData[:, 0] = np.random.rand(dims)
-    for index in range(1, length):
-        # scaling the random numbers by 0.1 so
-        # movement is small compared to position.
-        # subtraction by 0.5 is to change the range to [-0.5, 0.5]
-        # to allow a line to move backwards.
-        step = ((np.random.rand(dims) - 0.5) * 0.1)
-        lineData[:, index] = lineData[:, index - 1] + step
-
-    return lineData
-
-
 def update_bones(frame_num, skels, bone_lines):
-    # print("update by {}".format(frame_num))
-    # for line, data in zip(lines, dataLines):
-    #     # NOTE: there is no .set_data() for 3 dim data...
-    #     line.set_data(data[0:2, num-2:num])
-    #     line.set_3d_properties(data[2, num-2:num])
-
-    
     skel = skels[frame_num]
     for i, bone_line in enumerate(bone_lines):
         b = skel.bone(i)
@@ -95,8 +88,6 @@ def update_bones(frame_num, skels, bone_lines):
 fig = plt.figure()
 ax = p3.Axes3D(fig)
 
-# Fifty lines of random 3-D lines
-# data = [Gen_RandLine(25, 3) for index in range(50)]
 
 filedir = args.skeleton
 df = pd.read_csv(filedir)
@@ -106,7 +97,6 @@ skels = [Skel(row) for i, row in df.iterrows()]
 bone_lines = []
 skel = skels[0]
 for i in range(17):
-    # print("type = {}".format(type(i)))
     b = skel.bone(i)
     bone_lines.append(ax.plot(b[0], b[1], b[2])[0])
 
