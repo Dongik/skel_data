@@ -1,6 +1,10 @@
 
 # Insole to Skel data
 
+
+## 설명
+pressure_to_orthotics에 환자(subject_<환자번호>) 별로 압력(foot_pressure.csv), 족부보조기 높이 이미지(aligned_left.png, aligned_right.png)가 들어있습니다.
+
 ## Animate skeleton
 python skel_viewer.py -s skeleton_keep_walk.csv(default)
 
