@@ -3,7 +3,10 @@
 
 
 ## 설명
-pressure_to_orthotics에 환자(subject_<환자번호>) 별로 압력(foot_pressure.csv), 족부보조기 높이 이미지(aligned_left.png, aligned_right.png)가 들어있습니다.
+orthotics_data/subject_<환자번호>/ 경로내에 걸음걸이 족부보조기 데이터가 들어있습니다
+foot_pressure.csv
+족부보조기 높이 이미지(aligned_left.png, aligned_right.png
+(10, 30) 사이즈의 csv 파일도 있습니다.
 
 ## Animate skeleton
 python skel_viewer.py -s skeleton_keep_walk.csv(default)
