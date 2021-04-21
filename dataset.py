@@ -6,7 +6,7 @@ from torch.utils.data import Dataset
 
 # x: foot pressure, y: skel
 class SkelDataset(Dataset):
-    def __init__(self, train=True, csv_dir='skel_data', csv_file='skeleton_keep_walk.csv', transform=None):
+    def __init__(self, train=True, csv_dir='legacy_skeleton_data', csv_file='keep_walk.csv', transform=None):
         print('read file {}'.format(csv_file))
         df = pd.read_csv(os.path.join(csv_dir,csv_file))
         self.x = torch.Tensor(df.iloc[:,pd.np.r_[3:9, 26:42, 44:66]].values)
