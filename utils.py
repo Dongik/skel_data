@@ -24,16 +24,32 @@ class Skel:
 
 
 def png2csv(input_dir, output_size=(10, 30)):
+    import cv2
+
     img = cv2.imread(input_dir)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     
+    print(img.shape)
+    print("r = {}".format(img.shape[0]/img.shape[1]))
+
     img = cv2.resize(img, dsize=output_size)
     
-    maxh = img.amax()
-    minh = img.amin()
+    # maxh = img.amax()
+    # minh = img.amin()
 
-    cv2.imshow("show", img)
-    cv2.waitKey(0)
+    # cv2.imshow("show", img)
+    # cv2.waitKey(0)
+
+
+    a = 5
+    img = cv2.resize(img, dsize=(10 * a, 30 * a), interpolation=cv2.INTER_LINEAR)
+    
+    # cv2.imshow("show", img)
+    # cv2.waitKey(0)
+
+    cv2.imwrite('interpolated.png', img)
+
+    # img = cv2.resize(img, dsize=())
     
     output_dir = input_dir.replace(".png", ".csv")
     df = pd.DataFrame(img)
@@ -44,8 +60,9 @@ def png2csv(input_dir, output_size=(10, 30)):
 def png2csv_all():
     import cv2
 
-    for target_dir in glob.glob("orthotics_data/**/aligned_*.png"):
+    for target_dir in glob.glob("orthotics_data/**/*_orthotics.png"):
         png2csv(target_dir)
+        break
 
 
 def slice_gyro(df):
@@ -232,7 +249,7 @@ def decimate(workers=12):
 
 if __name__ == "__main__":
     # rename_files()
-    # png2csv_all()
-    slice_old_pressure()
+    png2csv_all()
+    # slice_old_pressure()
     pass
 
