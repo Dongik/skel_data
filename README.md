@@ -1,107 +1,16 @@
 
-# Insole to Skel data
+# Specification
+## 1. 발바닥압력 -> 몸뼈대
+### 1.1. 데이터 위치
+skeleton_data 경로내에 있으며 계속 걷는 데이터(skeleton_keep_walk.csv) 걸었다가 멈추는 데이터(skeleton_stop_walk_repeat.csv)가 있습니다.
 
+### 1.2. 데이터 헤더설명
 
-## 설명
-orthotics_data/subject_<환자번호>/ 경로내에 걸음걸이 족부보조기 데이터가 들어있습니다
-foot_pressure.csv
-족부보조기 높이 이미지(aligned_left.png, aligned_right.png
-(10, 30) 사이즈의 csv 파일도 있습니다.
-
-## Animate skeleton
-python skel_viewer.py -s skeleton_keep_walk.csv(default)
-
-## Header Info
-
-### 구조
-인솔 센서의 header 정보는 [side].[sensor_type].[index] 로 구성되어 있습니다.
-
+인솔 센서의 header 정보는 <side>.<sensor_type>.<index> 로 구성되어 있습니다.
 csv_count,
 time,
 left.insoleId,
 
-### left angular sensor
-left.ang.x,
-left.ang.y,
-left.ang.z,
-
-### left accel sensor
-left.acc.x,
-left.acc.y,
-left.acc.z,
-
-### left force sensor
-left.forces.0,
-left.forces.1,
-left.forces.2,
-left.forces.3,
-left.forces.4,
-left.forces.5,
-left.forces.6,
-left.forces.7,
-left.forces.8,
-left.forces.12,
-left.forces.13,
-left.forces.14,
-left.forces.17,
-left.forces.18,
-left.forces.21,
-left.forces.22,
-left.totalForce,
-
-### left force sensor (non calibrated)
-left.rawForces.0,
-left.rawForces.1,
-left.rawForces.2,
-left.rawForces.3,
-left.rawForces.4,
-left.rawForces.5,
-left.rawForces.6,
-left.rawForces.7,
-left.rawForces.8,
-left.rawForces.12,
-left.rawForces.13,
-left.rawForces.14,
-left.rawForces.17,
-left.rawForces.18,
-left.rawForces.21,
-left.rawForces.22,
-left.totalRawForce,
-right.insoleId,
-
-### 오른쪽은 왼쪽과 동일 패턴
-right.ang.x,
-right.ang.y,
-right.ang.z,
-right.acc.x,
-right.acc.y,
-right.acc.z,
-right.forces.0,
-right.forces.1,
-right.forces.2,
-right.forces.3,
-right.forces.4,
-right.forces.5,
-right.forces.6,
-right.forces.7,
-right.forces.8,
-right.forces.12,
-right.forces.13,
-right.forces.14,
-right.forces.17,
-right.forces.18,
-right.forces.21,
-right.forces.22,
-right.totalForce,
-right.rawForces.0,
-right.rawForces.1,
-right.rawForces.2,
-right.rawForces.3,
-right.rawForces.4,
-right.rawForces.5,
-right.rawForces.6,
-right.rawForces.7,
-right.rawForces.8,right.rawForces.12,right.rawForces.13,right.rawForces.14,right.rawForces.17,right.rawForces.18,right.rawForces.21,right.rawForces.22,right.totalRawForce,
 
 ### skel positions
 [index]\_[axis(xyzuvw)]
@@ -131,5 +40,12 @@ u, v, w,는 joint의 벡터입니다.
 
 ## 압력센서 번호별 위치
 ![plot](./insole.jpg)
+
+
+### 1.3. 결과물 재생하는 법
+
+```python skel_viewer.py -s skeleton_keep_walk.csv(default)```
+
+
 
 
