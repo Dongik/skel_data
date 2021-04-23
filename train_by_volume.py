@@ -84,19 +84,21 @@ class SkelCsvReader:
         self.df = df
 
     def p_dataset(self):
-        lgs = df.columns.get_loc("left.ang.x")
-        lgs = df.columns.get_loc("right.ang.x")
-        return self.df.loc[:, pd.np.r_[:7, 26:42]]
+        pn = 16
+        lps = df.columns.get_loc("left.forces.0")
+        rps = df.columns.get_loc("right.forces.0")
+        return self.df.loc[:, pd.np.r_[lps:lps + pn, rps: rps + pn]]
 
     def g_dataset(self):
+        gn = 6
         lgs = df.columns.get_loc("left.ang.x")
-        lgs = df.columns.get_loc("left.ang.x")
-        return self.df.loc[:, pd.np.r_[3:9, 26:42]]
+        rgs = df.columns.get_loc("right.ang.x")
+        return self.df.loc[:, pd.np.r_[lgs:lgs + gn, rgs:rgs + gn]]
     
     def s_dataset(self):
-        lgs = df.columns.get_loc("left.ang.x")
-        lgs = df.columns.get_loc("left.ang.x")
-        return self.df.loc[:, pd.np.r_[3:9, 26:42]]
+        sn = 3 * 17
+        ss = df.columns.get_loc("0.x")
+        return self.df.loc[:, ss:ss + sn]
 
     
 

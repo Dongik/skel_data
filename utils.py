@@ -8,19 +8,65 @@ import os
 source_prefix = "original"
 
 
+
+joint_index = [
+    1, 15, 1, 2, 3,
+    1, 5, 6, 14, 8,
+    9, 14, 11, 12, 14,
+    14, 1
+]
+
 class Skel:
-    def __init__(self, row):
-        self.row = row
+    def __init__(self, s_row):
+        self.s_row = s_row
     
     def joint(self, i):
         # print("type = {} at joint".format(type(i)))
-        ii = 84 + i * 6
-        r = self.row
-        return [r[ii], r[ii + 1], -r[ii + 2]]
+        
+        ii = i * 3
+        if self.s_row:
+            r = self.s_row
+            return [r[ii], r[ii + 1], -r[ii + 2]]
+        
 
     def bone(self, i):
-        b = [self.joint(i), self.joint(joint_tree[i])]
+        b = [self.joint(i), self.joint(joint_index[i])]
         return np.array(b).swapaxes(0, -1)
+
+
+class DatasetReader:
+    def __init__(self, csv_dir):
+        self.csv_dir = csv_dir
+        df = pd.read_csv(csv_dir)
+        self.df = df
+
+    @property
+    def pressure(self):
+        pn = 16
+        lps = self.df.columns.get_loc("left.forces.0")
+        rps = self.df.columns.get_loc("right.forces.0")
+        return self.df.iloc[:, pd.np.r_[lps:lps + pn, rps: rps + pn]].values
+
+    @property
+    def gyro(self):
+        gn = 6
+        lgs = self.df.columns.get_loc("left.ang.x")
+        rgs = self.df.columns.get_loc("right.ang.x")
+        return self.df.iloc[:, pd.np.r_[lgs:lgs + gn, rgs:rgs + gn]].values
+    
+    @property
+    def skeleton(self):
+        sn = 3 * 17
+        ss = self.df.columns.get_loc("0.x")
+        return self.df.iloc[:, ss:ss + sn].values
+
+
+def load_dataset(csv_dir="skeleton_data/keep_walk.csv"):
+    return DatasetReader(csv_dir)
+
+
+    
+
 
 
 def png2csv(input_dir, output_size=(10, 30)):
@@ -72,29 +118,61 @@ p_cols = list(range(9, 25)) + list(range(50, 66))
 g_cols = list(range(3, 10)) + list(range(44, 51))
 cols = list(range(3))
 
-def slice_old_skeleton_csv():
+# def slice_old_skeleton_csv():
 
-    cols = pd.np.r_[3:25, 44:66, 84:185]
-    print(cols)
+#     cols = pd.np.r_[3:25, 44:66, 84:185]
+#     print(cols)
     
-    for old_csv_dir in glob.glob("skeleton_data/old_*.csv"):
-        new_csv_dir = old_csv_dir.replace("old_", "")
+#     for old_csv_dir in glob.glob("skeleton_data/old_*.csv"):
+#         new_csv_dir = old_csv_dir.replace("old_", "")
+#         o_df = pd.read_csv(old_csv_dir)
+#         print(print("col n = {}".format(o_df.shape)))
+#         n_df = pd.DataFrame(o_df.iloc[:,cols])
+#         n_df.to_csv(new_csv_dir)
+
+
+
+def r_(s, e):
+    return list(range(s, e))
+
+def slice_old_pressure_to_skel():
+    # cols = pd.np.r_[3:25, 44:66]
+    cols = r_(3, 25) + r_(44, 66)
+    s_cols = []
+    for i in range(17):
+        ii = i * 6
+        ss = 84
+        s_cols.append(ss + ii)
+        s_cols.append(ss + ii + 1)
+        s_cols.append(ss + ii + 2)
+    
+    cols += s_cols
+
+    print(cols)
+    for old_csv_dir in glob.glob("legacy_skeleton_data/*.csv"):
+        new_csv_dir = old_csv_dir.replace("legacy_skeleton_data", "skeleton_data")
         o_df = pd.read_csv(old_csv_dir)
         print(print("col n = {}".format(o_df.shape)))
         n_df = pd.DataFrame(o_df.iloc[:,cols])
         n_df.to_csv(new_csv_dir)
-
-
 
 def slice_old_pressure():
-    cols = pd.np.r_[3:25, 44:66]
+    cols = r_(2, 24) + r_(43, 65)
+    cols_2 = r_(3, 25) + r_(44, 66)
+
     print(cols)
     for old_csv_dir in glob.glob("orthotics_data/**/foot_pressures.csv"):
-        new_csv_dir = old_csv_dir.replace("foot_pressures", "insole_sensor_data")
+        new_csv_dir = old_csv_dir.replace("foot_pressures", "gyro_pressure")
+        if "subject_5" in old_csv_dir:
+            c = cols_2
+        else:
+            c = cols
+
         o_df = pd.read_csv(old_csv_dir)
+        n_df = pd.DataFrame(o_df.iloc[:,c])
         print(print("col n = {}".format(o_df.shape)))
-        n_df = pd.DataFrame(o_df.iloc[:,cols])
         n_df.to_csv(new_csv_dir)
+
 
 def transform():
     inputPoly = read_stl(filename="original_right.stl")
@@ -225,10 +303,6 @@ def decimate(workers=12):
     with Pool(processes=workers) as pool:
         targets = glob.glob("subject_datasets/**/{}_*.stl".format(source_prefix))
         print(pool.map(decimation, targets))
-
-
-
-
 
 if __name__ == "__main__":
     # rename_files()
