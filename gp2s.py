@@ -8,7 +8,7 @@ import torchvision
 import torch.nn.functional as F
 
 from dataset import SkelDataset
-from model import FC
+from models.linear import LinearRegressor
 
 #tr = torch.nn.Sequential(
 #    torchvision.transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5)))
@@ -32,7 +32,7 @@ device = torch.device('cuda:1')
 lr = 0.0001
 epochs = 200
 
-net = FC().to(device)
+net = LinearRegressor().to(device)
 criterion = nn.MSELoss()
 #criterion = lambda pred, y: torch.mean((pred - y)**2)
 #optim = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9)
