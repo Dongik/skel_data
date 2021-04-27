@@ -6,22 +6,33 @@ from torch.utils.data import Dataset
 
 # x: foot pressure, y: skel
 class SkelDataset(Dataset):
-    def __init__(self, train=True, csv_dir='legacy_skeleton_data', csv_file='keep_walk.csv', transform=None):
-        print('read file {}'.format(csv_file))
-        df = pd.read_csv(os.path.join(csv_dir,csv_file))
-        self.x = torch.Tensor(df.iloc[:,pd.np.r_[3:9, 26:42, 44:66]].values)
-        self.y = torch.Tensor(df.iloc[:, 84:186].values)
+    def __init__(self, train=True, data_x = None, data_y = None, csv_dir='skeleton_data', csv_file='keep_walk.csv', transform=None):
+        # data array exist
+        if data_x is not None:
+            self.x = torch.Tensor(data_x)
+            if data_y is not None:
+                self.y = torch.Tensor(data_y)
+            else:
+                self.y = torch.zeros(len(data_x), 1)
         
-        pivot = int(len(self.y) * 0.8)
-        if train:
-            self.x = self.x[:pivot]
-            self.y = self.y[:pivot]
+        # Read csv file
         else:
-            self.x = self.x[pivot:]
-            self.y = self.y[pivot:]
+            print('read file {}'.format(csv_file))
+            df = pd.read_csv(os.path.join(csv_dir,csv_file), index_col=0)
+            self.x = torch.Tensor(df.iloc[:,:44].values)
+            self.y = torch.Tensor(df.iloc[:,44:].values)
+        
+            # Split dataset if Train
+            pivot = int(len(self.y) * 0.8)
+            if train:
+                self.x = self.x[:pivot]
+                self.y = self.y[:pivot]
+            else:
+                self.x = self.x[pivot:]
+                self.y = self.y[pivot:]
 
-        print(self.x.size())
-        print(self.y.size())
+        print("X:", self.x.size())
+        print("Y:", self.y.size())
 
         self.transform = transform
         
