@@ -1,6 +1,7 @@
 from torch import nn
 from torch.nn import functional as F
 
+# Many to Many(Sequential)
 class LinearRegressor(nn.Module):
     def __init__(self, input_dim=44, output_dim=51):
         super(LinearRegressor, self).__init__()
@@ -14,18 +15,20 @@ class LinearRegressor(nn.Module):
         self.bn1 = nn.BatchNorm1d(128)
         self.bn2 = nn.BatchNorm1d(256)
         self.bn3 = nn.BatchNorm1d(384)
-		
-        # Weight initialization
-        nn.init.xavier_uniform_(self.fc1.weight)
-        nn.init.xavier_uniform_(self.fc2.weight)
-        nn.init.xavier_uniform_(self.fc3.weight) 
-
+		 
     def forward(self, x):
         x = F.relu(self.bn1(self.fc1(x)))
         x = F.relu(self.bn2(self.fc2(x)))
         x = F.relu(self.bn3(self.fc3(x)))
         x = self.regressor(x)
         return x
+
+    def init_weights(self):
+        # Weight initialization
+        nn.init.xavier_uniform_(self.fc1.weight)
+        nn.init.xavier_uniform_(self.fc2.weight)
+        nn.init.xavier_uniform_(self.fc3.weight) 
+        nn.init.xavier_uniform_(self.regressor.weight)
 
 if __name__=="__main__":
     import torch
