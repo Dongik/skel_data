@@ -59,7 +59,7 @@ class OrthoticDataset(Dataset):
             if data_y is not None:
                 self.y = torch.Tensor(data_y)
             else:
-                self.y = torch.zeros(len(data_x), 1)
+                self.y = torch.zeros(len(data_x), orthotic_height*orthotic_width*2)
         
         # Read csv file
         else:
