@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import glob
 
 import torch
 from torch.utils.data import Dataset
@@ -11,7 +12,7 @@ orthotic_train_num = 5000 # must be even
 
 # x: foot pressure, y: skel
 class SkelDataset(Dataset):
-    def __init__(self, train=True, data_x = None, data_y = None, csv_dir='skeleton_data', csv_file='keep_walk.csv', train_ratio=0.8, transform=None):
+    def __init__(self, train=True, data_x = None, data_y = None, csv_dir='skeleton_data', csv_file=None, train_ratio=0.8, transform=None):
         # data array exist
         if data_x is not None:
             self.x = torch.Tensor(data_x)
@@ -22,19 +23,30 @@ class SkelDataset(Dataset):
         
         # Read csv file
         else:
-            print('read file {}'.format(csv_file))
-            df = pd.read_csv(os.path.join(csv_dir,csv_file), index_col=0)
-            self.x = torch.Tensor(df.iloc[:,:44].values)
-            self.y = torch.Tensor(df.iloc[:,44:].values)
-        
-            # Split dataset if Train
-            pivot = int(len(self.y) * train_ratio)
-            if train:
-                self.x = self.x[:pivot]
-                self.y = self.y[:pivot]
+            # Read whole directory
+            if csv_file is None:
+                files = glob.glob(os.path.join(csv_dir, '*.csv'))
+            # Read specific csv file
             else:
-                self.x = self.x[pivot:]
-                self.y = self.y[pivot:]
+                files = [os.path.join(csv_dir, csv_file)]
+            
+            x, y = [], [] 
+            for file_name in files:
+                # read file
+                print('read file {}'.format(file_name))
+                df = pd.read_csv(file_name, index_col=0)
+
+                # split dataset (each file)
+                pivot = int(len(df) * train_ratio)
+                if train:
+                    x_, y_ = df.iloc[:pivot, :44], df.iloc[:pivot, 44:]
+                else:
+                    x_, y_ = df.iloc[pivot:, :44], df.iloc[pivot:, 44:]
+                x.append(torch.Tensor(x_.values))
+                y.append(torch.Tensor(y_.values))
+
+            # concat to one tensor 
+            self.x, self.y = torch.cat(x, dim=0), torch.cat(y, dim=0) 
 
         print("X:", self.x.size())
         print("Y:", self.y.size())
@@ -123,7 +135,7 @@ def read_orthotics_data(data_dir):
                 right_ = pd.read_csv(os.path.join(path, filename), index_col=0)
                 y_[orthotic_height * orthotic_width:] = totensor_orthotics(right_)
 
-# append when orthotics readed
+        # append when orthotics readed
         if torch.sum(y_!=0).item() > 0:
             y.append(y_)
     return torch.stack(x, dim=0), torch.stack(y, dim=0)
