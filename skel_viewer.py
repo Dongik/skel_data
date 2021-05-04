@@ -4,13 +4,6 @@ import matplotlib.animation as animation
 import numpy as np
 import pandas as pd
 import argparse
-parser = argparse.ArgumentParser()
-parser.add_argument('-s', '--skeleton', default='skeleton_keep_walk.csv', type=str, metavar='NAME', help='target dataset')
-args = parser.parse_args()
-
-
-# Fixing random state for reproducibility
-np.random.seed(19680801)
 
 joint_names=[
     # 0-4
@@ -60,12 +53,13 @@ p_pos = [
 
 
 class Skel:
-    def __init__(self, row):
+    def __init__(self, row, is_csv=True):
         self.row = row
+        self.pivot = 44 if is_csv else 0
     
     def joint(self, i):
         # print("type = {} at joint".format(type(i)))
-        ii = 84 + i * 6
+        ii = self.pivot + i * 3
         r = self.row
         return [r[ii], r[ii + 1], -r[ii + 2]]
 
@@ -84,37 +78,51 @@ def update_bones(frame_num, skels, bone_lines):
 
     return bone_lines
 
-# Attaching 3D axis to the figure
-fig = plt.figure()
-ax = p3.Axes3D(fig)
+def plot_skeleton(data, title='3D Test', is_csv=True):
+     # Attaching 3D axis to the figure
+    fig = plt.figure()
+    ax = p3.Axes3D(fig)
+    
+    skels = [Skel(row, is_csv) for row in data]
+    
+    bone_lines = []
+    skel = skels[0]
+    for i in range(17):
+        b = skel.bone(i)
+        bone_lines.append(ax.plot(b[0], b[1], b[2])[0])
 
 
-filedir = args.skeleton
-df = pd.read_csv(filedir)
-print("read file {}".format(filedir))
-skels = [Skel(row) for i, row in df.iterrows()]
+    # Setting the axes properties
+    ax.set_xlim3d([-1.0, 1.0])
+    ax.set_xlabel('X')
+    
+    ax.set_ylim3d([-1.0, 1.0])
+    ax.set_ylabel('Y')
 
-bone_lines = []
-skel = skels[0]
-for i in range(17):
-    b = skel.bone(i)
-    bone_lines.append(ax.plot(b[0], b[1], b[2])[0])
+    ax.set_zlim3d([-1.0, 1.0])
+    ax.set_zlabel('Z')
 
+    ax.set_title(title)
 
-# Setting the axes properties
-ax.set_xlim3d([-1.0, 1.0])
-ax.set_xlabel('X')
-
-ax.set_ylim3d([-1.0, 1.0])
-ax.set_ylabel('Y')
-
-ax.set_zlim3d([-1.0, 1.0])
-ax.set_zlabel('Z')
-
-ax.set_title('3D Test')
-
-# Creating the Animation object
-line_ani = animation.FuncAnimation(fig, update_bones, len(df.index), fargs=(skels, bone_lines),
+    # Creating the Animation object
+    line_ani = animation.FuncAnimation(fig, update_bones, len(data), fargs=(skels, bone_lines),
                                    interval=1000/30, blit=False)
 
-plt.show()
+    plt.show()
+
+
+if __name__=="__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-s', '--skeleton', default='skeleton_data/keep_walk.csv', type=str, metavar='NAME', help='target dataset')
+    parser.add_argument('-t', '--title', default='3D Test', type=str, metavar='NAME', help='title of plot')
+    args = parser.parse_args()
+
+    # Fixing random state for reproducibility
+    np.random.seed(19680801)
+
+    filedir = args.skeleton
+    df = pd.read_csv(filedir, index_col=0)
+    print("read file {}".format(filedir))
+   
+    # plot skeleton by matplotlib
+    plot_skeleton(df.values, args.title)
