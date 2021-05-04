@@ -21,8 +21,8 @@ if __name__=="__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-lr', '--learning_rate', default=0.0001, type=float, metavar='NAME', help='Learning Rate')
-    parser.add_argument('-e', '--epochs', default=200, type=int, metavar='NAME', help='Number of Epochs')
-    parser.add_argument('-b', '--batch_size', default=512, type=int, metavar='NAME', help='Batch Size')
+    parser.add_argument('-e', '--epochs', default=300, type=int, metavar='NAME', help='Number of Epochs')
+    parser.add_argument('-b', '--batch_size', default=1024, type=int, metavar='NAME', help='Batch Size')
     parser.add_argument('-l', '--loss', default='mse', type=str, metavar='NAME', help='Type of Loss Function')
     parser.add_argument('-gpu', '--gpu_ids', default=0, type=int, metavar='NAME', help='GPU Numbers')
     args = parser.parse_args()
@@ -52,7 +52,14 @@ if __name__=="__main__":
     
     args.loss = args.loss.lower()
     if args.loss == 'rmse':
-        criterion = nn.RMSELoss() 
+        class RMSELoss(nn.Module):
+            def __init__(self):
+                super(RMSELoss,self).__init__()
+                self.mse = nn.MSELoss()
+                self.eps = 1e-7
+            def forward(self,y,y_hat):
+                return torch.sqrt(self.mse(y,y_hat) + self.eps)
+        criterion = RMSELoss() 
     # mse
     else :
         criterion = nn.MSELoss()
@@ -63,7 +70,7 @@ if __name__=="__main__":
     net.train()
     
     # train
-    for epoch in range(epochs):
+    for epoch in range(1, epochs+1):
         train_loss = 0
         train_len = 0
         for x, y in train_loader:
@@ -81,11 +88,16 @@ if __name__=="__main__":
     
         print('epoch: {}'.format(epoch+1))
         print('tr_loss: {}'.format(train_loss.item() / train_len))
+        
+        # test(val)
+        if epoch % 10 == 0:
+            test_pred = gp2s(gyro_data=test_dataset.x, skel_data=test_dataset.y, model=net, batch_size=args.batch_size, gpu_ids=args.gpu_ids)
    
-
+    # Save Model
     print('Save Model ...')
     model_dir = 'logs'
-    model_file = 'gp2s.pt'
+    model_file = 'gp2s_b{}_e{}_lr{}_{}.pt'.format(args.batch_size, args.epochs, 
+            str(args.learning_rate).replace('.','_'), args.loss)
     model_path = os.path.join(model_dir, model_file)
     torch.save(net.state_dict(), model_path)
     print(model_path, 'Saved.')
