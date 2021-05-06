@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
@@ -9,6 +10,8 @@ from torch.utils.data import DataLoader
 from dataset import SkelDataset, OrthoticDataset
 from models.linear import LinearRegressor
 from models.lstm import LSTMRegressor
+
+from skel_viewer import plot_skeleton
 
 num_gyro = 44
 num_skel = 51
@@ -23,7 +26,7 @@ seq_len = 5000
 #   1. model: get model from memory
 #   2. model_dir, model_file: Load model from file path
 # Return predicted skeleton: Numpy array(data_num x 51)
-def gp2s(gyro_data=None, skel_data=None, model=None, model_dir='logs/', model_file='gp2s.pt', batch_size=512, gpu_ids=0):
+def gp2s(gyro_data=None, skel_data=None, model=None, model_dir='logs/', model_file='gp2s.pt', batch_size=512, gpu_ids=0, plot_skel=False):
 
     test_dataset = SkelDataset(train=False, data_x=gyro_data, data_y=skel_data)
     
@@ -69,10 +72,17 @@ def gp2s(gyro_data=None, skel_data=None, model=None, model_dir='logs/', model_fi
     
     # Print loss when skeleton data exist
     if skel_data is not None:
-        print('test loss: {}'.format(test_loss / test_len))
+        print('Test Loss: {}'.format(test_loss / test_len))
     
     print(test_pred.size())
-    return test_pred.numpy()
+    test_pred = test_pred.numpy()
+    
+    # plotting predicted skeleton
+    if plot_skel:
+        plot_skeleton(test_pred, is_csv=False)
+
+    return test_pred
+
 
 # Predict orthotics from gyro data
 # gyro_data is Numpy array(subject_num, seq_num(must 5000) x 44)
@@ -154,7 +164,7 @@ def orthotics(gyro_data=None, orthotic_left=None, orthotic_right=None, model_typ
     
     # Print loss when skeleton data exist
     if data_y is not None:
-        print('test loss: {}'.format(test_loss / test_len))
+        print('Test Loss: {}'.format(test_loss / test_len))
     
     # Smooth and Reshape to left and right orthotics
     test_pred = ((test_pred - test_pred.min()) / test_pred.max() * 256).type(torch.int32)
@@ -166,6 +176,17 @@ def orthotics(gyro_data=None, orthotic_left=None, orthotic_right=None, model_typ
     right = test_pred[:, orthotic_height:]
 
     return left.numpy(), right.numpy()
+
+def test_gp2s(csv_dir='skeleton_data', csv_file='keep_walk.csv', model_file='gp2s.py'):
+    df = pd.read_csv(os.path.join(csv_dir, csv_file), index_col=0)
+    x = np.array(df.iloc[:,:44].values)
+    y = np.array(df.iloc[:,44:].values)
+    
+    pivot = int(len(y) * 0.8)
+    x, y = x[pivot:], y[pivot:]
+                                     
+    pred = gp2s(gyro_data=x, skel_data=y, model_file=model_file, plot_skel=True)
+    return pred
 
 def test_infer_orthotics():
     data = OrthoticDataset(train=True,train_ratio=1.0)

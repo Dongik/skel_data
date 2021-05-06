@@ -4,13 +4,6 @@ import matplotlib.animation as animation
 import numpy as np
 import pandas as pd
 import argparse
-parser = argparse.ArgumentParser()
-parser.add_argument('-s', '--skeleton', default='skeleton_keep_walk.csv', type=str, metavar='NAME', help='target dataset')
-args = parser.parse_args()
-
-
-# Fixing random state for reproducibility
-np.random.seed(19680801)
 
 joint_names=[
     # 0-4
@@ -70,7 +63,6 @@ def update_bones(frame_num, skel_data, bone_lines):
         bone_line.set_3d_properties(b[2])
 
     return bone_lines
-
 
 def bone(i, s):
     j0, j1 = i * 3, joint_tree[i] * 3

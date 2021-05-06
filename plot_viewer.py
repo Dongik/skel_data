@@ -14,9 +14,9 @@ from mpl_toolkits.mplot3d.art3d import Line3DCollection
 
 
 
-df = pd.read_csv("skeleton_stop_walk_repeat.csv")
+df = pd.read_csv("skeleton_data/keep_walk.csv")
 
-pressures = df.iloc[:,"":""].values
+pressures = df.iloc[:,:44].values
 
 
 # create the figure
