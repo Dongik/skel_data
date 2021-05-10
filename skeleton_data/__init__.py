@@ -3,7 +3,7 @@ import pandas as pd
 
 gn = 6
 pn = 16
-gp_n = gp + pn
+gn_n = gp + pn
 
 sn = 51 # 17 * 3
 

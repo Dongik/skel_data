@@ -6,7 +6,7 @@ import glob
 from multiprocessing import Process, Pool
 import os
 source_prefix = "original"
-
+import numpy as np
 
 
 joint_index = [
@@ -154,19 +154,19 @@ def r_(s, e):
 
 def slice_old_pressure_to_skel():
     # cols = pd.np.r_[3:25, 44:66]
-    cols = r_(3, 25) + r_(44, 66)
-    s_cols = []
-    for i in range(17):
-        ii = i * 6
-        ss = 84
-        s_cols.append(ss + ii)
-        s_cols.append(ss + ii + 1)
-        s_cols.append(ss + ii + 2)
+    cols = np.r_[3: 25, 44: 66, 84 : 84 + 3 * 17]
+    # s_cols = []
+    # for i in range(17):
+    #     ii = i * 6
+    #     ss = 84
+    #     s_cols.append(ss + ii)
+    #     s_cols.append(ss + ii + 1)
+    #     s_cols.append(ss + ii + 2)
     
-    cols += s_cols
+    # cols += s_cols
 
     print(cols)
-    for old_csv_dir in glob.glob("legacy_skeleton_data/*.csv"):
+    for old_csv_dir in glob.glob("legacy_skeleton_data/skeleton_*.csv"):
         new_csv_dir = old_csv_dir.replace("legacy_skeleton_data", "skeleton_data")
         o_df = pd.read_csv(old_csv_dir)
         print(print("col n = {}".format(o_df.shape)))
@@ -206,6 +206,33 @@ def read_stl(filename="original_right.stl"):
     inputPoly = vtk.vtkPolyData()
     inputPoly.ShallowCopy(reader.GetOutput())
     return inputPoly
+
+joint_names=[
+    # 0-4
+    'head_top', 'neck', 'right_shoulder', 'right_elbow', 'right_wrist',
+    # 5-9
+    'left_shoulder', 'left_elbow', 'left_wrist', 'right_hip', 'right_knee',
+    # 10-14
+    'right_ankle', 'left_hip', 'left_knee', 'left_ankle', 'pelvis',
+    # 15-16
+    'spine', 'head',
+]
+
+def normalize_skel():
+    if not os.path.isdir("skeleton_data_v2"):
+        os.mkdir("skeleton_data_v2")
+
+    for skel_dir in glob.glob("skeleton_data/*.csv"):
+        df = pd.read_csv(skel_dir)
+        s = df.iloc[:,45:].values
+        f = df.iloc[:,1:45].values
+        
+        p = s[:,joint_names.index('pelvis')]
+        pt = np.tile(p, len(joint_names))
+        
+        s -= p
+
+        f2s = np.vstack((f, s))
 
 
 
@@ -323,7 +350,7 @@ def decimate(workers=12):
 
 if __name__ == "__main__":
     # rename_files()
-    png2csv_all()
-    # slice_old_pressure()
+    # png2csv_all()
+    slice_old_pressure_to_skel()
     pass
 
