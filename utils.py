@@ -7,7 +7,7 @@ from multiprocessing import Process, Pool
 import os
 source_prefix = "original"
 import numpy as np
-
+from tqdm import tqdm
 
 joint_index = [
     1, 15, 1, 2, 3,
@@ -169,7 +169,7 @@ def slice_old_pressure_to_skel():
     for old_csv_dir in glob.glob("legacy_skeleton_data/skeleton_*.csv"):
         new_csv_dir = old_csv_dir.replace("legacy_skeleton_data", "skeleton_data")
         o_df = pd.read_csv(old_csv_dir)
-        print(print("col n = {}".format(o_df.shape)))
+        print("col n = {}".format(o_df.shape))
         n_df = pd.DataFrame(o_df.iloc[:,cols])
         n_df.to_csv(new_csv_dir)
 
@@ -187,7 +187,7 @@ def slice_old_pressure():
 
         o_df = pd.read_csv(old_csv_dir)
         n_df = pd.DataFrame(o_df.iloc[:,c])
-        print(print("col n = {}".format(o_df.shape)))
+        print("col n = {}".format(o_df.shape))
         n_df.to_csv(new_csv_dir)
 
 
@@ -218,21 +218,92 @@ joint_names=[
     'spine', 'head',
 ]
 
+
+# normalize by pelvis position
+# normalize by pelvis width
+
 def normalize_skel():
-    if not os.path.isdir("skeleton_data_v2"):
-        os.mkdir("skeleton_data_v2")
+    cols = []
+    axises = ['x', 'y', 'z']
+    gyro_types = ['an', 'ac']
+    sides = ['l', 'r']
+    fsr_num = 16
+    joint_num = 17
 
-    for skel_dir in glob.glob("skeleton_data/*.csv"):
+    for side in sides:
+        for gyro_type in gyro_types:
+            for axis in axises:
+                cols.append("{}.{}.{}".format(side, gyro_type, axis))
+        for fsr_index in range(fsr_num):
+            cols.append("p{}".format(fsr_index))
+    
+    for ji in range(joint_num):
+        for a in axises:
+            cols.append("s.{}.{}".format(ji, a))
+
+    for skel_dir in tqdm(glob.glob("skeleton_data/*.csv")):
+        
         df = pd.read_csv(skel_dir)
-        s = df.iloc[:,45:].values
-        f = df.iloc[:,1:45].values
-        
-        p = s[:,joint_names.index('pelvis')]
-        pt = np.tile(p, len(joint_names))
-        
-        s -= p
+        f = df.iloc[:, 1:45].values  # foot data
+        s = df.iloc[:, 45:].values   # skel data
 
-        f2s = np.vstack((f, s))
+        ln = s.shape[0]
+        jn = 17
+        cn = 3
+
+        # print("s.shape = {}".format(s.shape))
+        s = np.reshape(s, (ln, jn, cn))
+        
+        p = s[:,joint_names.index("pelvis")] # pelvis
+        sp = s[:,joint_names.index("spine")]
+
+        lf = s[:, joint_names.index("left_ankle")]
+        rf = s[:, joint_names.index("right_ankle")]
+        
+        g = np.minimum(lf[:,2], rf[:,2])
+        c = (lf[:,:2] - rf[:,:2]) / 2
+        print("g.s = {}, c.s = {}".format(g.shape, c.shape))
+        gc = np.hstack([c, g]) 
+        
+        sl = np.sqrt(np.sum((p - sp) ** 2, axis=1))
+
+        # sl = sl.T 
+        print("sl.shape = {}, ls = {}".format(sl.shape, sl[ln // 2]))
+        sl = 0.2 / sl
+
+        s = np.reshape(s, (ln, jn * cn))
+        # s = s * sl.T
+        
+        
+
+        # print("p.shape = {}".format(p.shape))
+        scale = np.tile(sl, (jn * cn, 1))
+        # pivot = np.tile(p, (1, jn))
+        pivot = np.tile(gc, (1, jn))
+
+        print("scale.s = {}, pivot.shape = {}".format(scale.shape, pivot.shape))
+        # .reshape(ln, jn, cn)
+        # print("pr.shape = {}".format(pr.shape))
+        # print("pr = {}".format(pr[ln // 2]))
+        
+
+        # s = np.sum((s, pr), axis=2)
+        s -= pivot
+        s = scale.T * s
+
+        
+        
+        # print("s.shape = {}".format(s.shape))
+
+        # s = np.reshape(s, (ln, jn * cn))
+
+        f2s = np.hstack([f, s])
+
+        ndf = pd.DataFrame(f2s, columns=cols)
+        
+        n_skel_dir = skel_dir.replace("skeleton_data", "skeleton_data_v2")
+
+        ndf.to_csv(n_skel_dir)
 
 
 
@@ -351,6 +422,7 @@ def decimate(workers=12):
 if __name__ == "__main__":
     # rename_files()
     # png2csv_all()
-    slice_old_pressure_to_skel()
+    # slice_old_pressure_to_skel()
+    normalize_skel()
     pass
 

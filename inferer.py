@@ -58,24 +58,11 @@ class SkelInferer:
 class OrthoticsInferer:
     def __init__(self, gpu_ids=0, model_dir="logs/", model_file='orthotics_lstm_b1_e400_lr0_0002_mse.pt', seq_len=5000):
         print("load orthtics model")
-        device = torch.device('cuda:{}'.format(gpu_ids)) if torch.cuda.is_available() else torch.device('cpu') 
-        
-        if 'lstm' in model_file:
-            net = LSTMRegressor(num_gyro, orthotic_height * orthotic_width * 2).to(device)
-        elif 'linear' in model_file:
-            net = LinearRegressor(num_gyro*seq_len, orthotic_height * orthotic_width * 2).to(device)
         
         self.save_dir = "static/orthotics.csv"
-
-        if 'skel_data' in os.listdir():
-            model_dir = os.path.join('skel_data', model_dir)
-        else:
+        if 'skel_data' not in os.listdir():
             self.save_dir = os.path.join("..", self.save_dir)
         
-        net.load_state_dict(torch.load(os.path.join(model_dir, model_file)))
-        self.net = net.to(device)
-        self.net.eval()
-        self.device = device
         self.x_series = deque(maxlen=seq_len)
         self.seq_len = seq_len
         self.is_making = False
@@ -121,6 +108,7 @@ class OrthoticsInferer:
         
         if len(self.x_series) == self.seq_len and self.is_making:
             self.pbar.close()
+            self.pbar = tqdm(total=self.seq_len)
             # Thread(target=self.make_orthotics).start()
             self.make_orthotics()
         
