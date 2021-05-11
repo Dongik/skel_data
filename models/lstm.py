@@ -6,13 +6,14 @@ orthotic_height = 30
 
 # Many to One
 class LSTMRegressor(nn.Module):
-    def __init__(self, input_dim=44, output_dim=orthotic_width*orthotic_height, hidden_dim=256, num_layers=6, drop_prob=0.5):
+    def __init__(self, input_dim=44, output_dim=orthotic_width*orthotic_height, hidden_dim=256, num_layers=6, drop_prob=0.5, mult_pred=False):
         super(LSTMRegressor, self).__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
         self.drop_prob = drop_prob
+        self.mult_pred = mult_pred
 
         self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, dropout=drop_prob, batch_first=True)
         self.regressor = nn.Linear(hidden_dim, output_dim)
@@ -20,13 +21,19 @@ class LSTMRegressor(nn.Module):
         self.init_weights()
 
     def forward(self, x, hc=None):
+        batch_size = x.size(0)
+
         x, hc = self.lstm(x, hc)
         
+        # get whole output
+        if self.mult_pred:
+            x = x.reshape(x.size(0)*x.size(1), self.hidden_dim)
         # get last output
-        x = x[:,-1]
-        #x = x.reshape(x.size(0), x.size(1)*self.hidden_dim)
-        
+        else:
+            x = x[:,-1]
+
         x = self.regressor(x)
+        x = x.reshape(batch_size, x.size(0)//batch_size, x.size(1))
         return x, hc
 
     def init_weights(self):
