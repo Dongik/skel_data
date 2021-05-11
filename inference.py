@@ -7,7 +7,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
-from dataset import SkelDataset, OrthoticDataset
+from dataset import SkelDataset, SkelSeqDataset, OrthoticDataset
 from models.linear import LinearRegressor
 from models.lstm import LSTMRegressor
 
@@ -26,9 +26,12 @@ seq_len = 5000
 #   1. model: get model from memory
 #   2. model_dir, model_file: Load model from file path
 # Return predicted skeleton: Numpy array(data_num x 51)
-def gp2s(gyro_data=None, skel_data=None, model=None, model_dir='logs/', model_file='gp2s.pt', batch_size=512, gpu_ids=0, plot_skel=False):
+def gp2s(gyro_data=None, skel_data=None, model=None, seq_len=1, model_dir='logs/', model_type='linear', model_file='gp2s.pt', batch_size=512, gpu_ids=0, plot_skel=False):
 
-    test_dataset = SkelDataset(train=False, data_x=gyro_data, data_y=skel_data)
+    if model_type == 'linear':
+        test_dataset = SkelDataset(train=False, data_x=gyro_data, data_y=skel_data)
+    elif model_type == 'lstm':
+        test_dataset = SkelSeqDataset(train=False, seq_len=seq_len, data_x=gyro_data, data_y=skel_data)
     
     test_loader = DataLoader(dataset=test_dataset,
          batch_size=batch_size,
@@ -46,7 +49,10 @@ def gp2s(gyro_data=None, skel_data=None, model=None, model_dir='logs/', model_fi
     if model is not None:
         net = model.to(device)
     else:
-        net = LinearRegressor(num_gyro, num_skel)
+        if model_type == 'linear':
+            net = LinearRegressor(num_gyro, num_skel)
+        elif model_type == 'lstm':
+            net = LSTMRegressor(num_gyro, num_skel, mult_pred=True)
         net.load_state_dict(torch.load(os.path.join(model_dir, model_file)))
         net = net.to(device)
 
@@ -54,12 +60,19 @@ def gp2s(gyro_data=None, skel_data=None, model=None, model_dir='logs/', model_fi
     net.eval()
     with torch.no_grad():
         test_loss = 0
-        test_len = 0
+        test_len = 0 
         test_pred = torch.empty(0,num_skel)
+
         for x, y in test_loader:
+            batch_size = len(y)
             x, y = x.to(device), y.to(device)
-    
-            pred = net(x)
+             
+
+            if model_type == 'linear':
+                pred = net(x)
+            elif model_type == 'lstm':
+                hc = net.init_hidden_cell(batch_size)
+                pred, hc = net(x, hc)
             
             # Calc loss
             if skel_data is not None:
@@ -68,7 +81,10 @@ def gp2s(gyro_data=None, skel_data=None, model=None, model_dir='logs/', model_fi
                 test_len += len(x)
             
             # Concat predictions
-            test_pred = torch.cat([test_pred, pred.cpu()])
+            pred = pred.cpu()
+            if model_type == 'lstm':
+                pred = pred.reshape(pred.size(0)*pred.size(1), pred.size(2))
+            test_pred = torch.cat([test_pred, pred])
     
     # Print loss when skeleton data exist
     if skel_data is not None:
@@ -97,8 +113,8 @@ def gp2s(gyro_data=None, skel_data=None, model=None, model_dir='logs/', model_fi
 def orthotics(gyro_data=None, orthotic_left=None, orthotic_right=None, model_type='linear', model=None, model_dir='logs/', model_file='orthotics_fc.pt', batch_size=1, gpu_ids=0):
     data_y = None
     # concat left and right orthotics
-    if orthotic_left is not None and orthotics_right is not None:
-        data_y = torch.concat([orthotic_left, orthotic_right], dim=1)
+    if orthotic_left is not None and orthotic_right is not None:
+        data_y = torch.cat([orthotic_left, orthotic_right], dim=1)
     
     # if data has no batch, unsqueeze data
     gyro_data = torch.Tensor(gyro_data)
@@ -168,7 +184,7 @@ def orthotics(gyro_data=None, orthotic_left=None, orthotic_right=None, model_typ
     
     # Smooth and Reshape to left and right orthotics
     test_pred = ((test_pred - test_pred.min()) / test_pred.max() * 256).type(torch.int32)
-    test_pred[test_pred < 50] = 0
+    test_pred[test_pred < 40] = 0
 
     test_pred = test_pred.view(-1, orthotic_height*2, orthotic_width)
 
@@ -177,21 +193,21 @@ def orthotics(gyro_data=None, orthotic_left=None, orthotic_right=None, model_typ
 
     return left.numpy(), right.numpy()
 
-def test_gp2s(csv_dir='skeleton_data', csv_file='keep_walk.csv', model_file='gp2s.py'):
+def test_gp2s(csv_dir='skeleton_data', csv_file='keep_walk.csv', seq_len=200, model_type='linear', model_file='gp2s.pt'):
     df = pd.read_csv(os.path.join(csv_dir, csv_file), index_col=0)
     x = np.array(df.iloc[:,:44].values)
     y = np.array(df.iloc[:,44:].values)
     
     pivot = int(len(y) * 0.8)
     x, y = x[pivot:], y[pivot:]
-                                     
-    pred = gp2s(gyro_data=x, skel_data=y, model_file=model_file, plot_skel=True)
+          
+    pred = gp2s(gyro_data=x, skel_data=y, model_type=model_type, seq_len=seq_len, model_file=model_file, plot_skel=True)
     return pred
 
-def test_infer_orthotics():
+def test_infer_orthotics(model_type='linear', model_file='orthotics.pt'):
     data = OrthoticDataset(train=True,train_ratio=1.0)
 
-    left, right = orthotics(gyro_data=data.x, model_type='linear', model_file='orthotics_fc.pt', batch_size=5)
+    left, right = orthotics(gyro_data=data.x, model_type=model_type, model_file=model_file, batch_size=5)
 
     fig = plt.figure() # rows*cols 행렬의 i번째 subplot 생성
     rows = len(data.x)
@@ -217,7 +233,7 @@ if __name__=="__main__":
     
     print('GP2Skel')
     data = np.zeros((100, 44))
-    pred = gp2s(gyro_data=data, model_file='gp2s.pt')
+    pred = gp2s(gyro_data=data, model_file='gp2s_b8192_e200_lr0_001_rmse.pt')
     
     print('Shape of X:', data.shape)
     print('Shape of Pred:', pred.shape)
@@ -227,7 +243,7 @@ if __name__=="__main__":
     test_infer_orthotics()
     '''
     data = np.ones((1, 5000, 44))
-    left, right = orthotics(gyro_data=data, model_type='linear', model_file='orthotics_fc.pt')
+    left, right = orthotics(gyro_data=data, model_type='linear', model_file='orthotics.pt')
     
     print('Shape of X:', data.shape)
     print('Left:')

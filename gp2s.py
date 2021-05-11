@@ -9,13 +9,14 @@ from torch.utils.data import DataLoader
 import torchvision
 import torch.nn.functional as F
 
-from dataset import SkelDataset
+from dataset import SkelDataset, SkelSeqDataset
 from models.linear import LinearRegressor
+from models.lstm import LSTMRegressor
 
 from inference import gp2s
 
 num_gyro = 44
-num_skel = 51
+num_skel = 51 
 
 if __name__=="__main__":
 
@@ -24,6 +25,9 @@ if __name__=="__main__":
     parser.add_argument('-e', '--epochs', default=300, type=int, metavar='NAME', help='Number of Epochs')
     parser.add_argument('-b', '--batch_size', default=1024, type=int, metavar='NAME', help='Batch Size')
     parser.add_argument('-l', '--loss', default='mse', type=str, metavar='NAME', help='Type of Loss Function')
+    parser.add_argument('-m', '--model', default='linear', type=str, metavar='NAME', help='Type of Model')
+    parser.add_argument('-s', '--seq_len', default=200, type=int, metavar='NAME', help='Sequence Length of LSTM')
+    parser.add_argument('-n', '--n_layers', default=6, type=int, metavar='NAME', help='A number of Layers of LSTM')
     parser.add_argument('-gpu', '--gpu_ids', default=0, type=int, metavar='NAME', help='GPU Numbers')
     args = parser.parse_args()
 
@@ -33,10 +37,14 @@ if __name__=="__main__":
 
 
     # DATASETS
-    #data_name = 'skeleton_stop_walk_repeat.csv'    
-    train_dataset = SkelDataset(train=True, transform=tr)
-    test_dataset = SkelDataset(train=False, transform=tr)
-    
+    #data_name = 'skeleton_stop_walk_repeat.csv'
+    if args.model == 'linear':
+        train_dataset = SkelDataset(train=True, transform=tr)
+        test_dataset = SkelDataset(train=False, transform=tr)
+    elif args.model == 'lstm':
+        train_dataset = SkelSeqDataset(train=True, seq_len=args.seq_len, transform=tr)
+        test_dataset = SkelSeqDataset(train=False, seq_len=args.seq_len, transform=tr)
+
     train_loader = DataLoader(dataset=train_dataset,
          batch_size=args.batch_size,
          shuffle=True,
@@ -48,8 +56,11 @@ if __name__=="__main__":
     epochs = args.epochs
     
     # Models
-    net = LinearRegressor(num_gyro, num_skel).to(device)
-    
+    if args.model == 'linear':
+        net = LinearRegressor(num_gyro, num_skel).to(device)
+    elif args.model == 'lstm':
+        net = LSTMRegressor(num_gyro, num_skel, num_layers=args.n_layers, mult_pred=True).to(device)
+
     args.loss = args.loss.lower()
     if args.loss == 'rmse':
         class RMSELoss(nn.Module):
@@ -66,19 +77,24 @@ if __name__=="__main__":
 
     #optim = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9)
     optim = torch.optim.Adam(net.parameters(), lr=lr)
-    
-    net.train()
-    
+     
     # train
     for epoch in range(1, epochs+1):
+        net.train()
         train_loss = 0
         train_len = 0
         for x, y in train_loader:
+            batch_size = len(y)
             x, y = x.to(device), y.to(device)
-    
-            pred = net(x)
+             
+            if args.model == 'linear':
+                pred = net(x)
+            elif args.model == 'lstm':
+                hc = net.init_hidden_cell(batch_size)
+                pred, hc = net(x, hc)
+            
             loss = criterion(pred, y)
-    
+                
             loss.backward()
             optim.step()
             optim.zero_grad()
@@ -86,26 +102,27 @@ if __name__=="__main__":
             train_loss += loss
             train_len += len(x)
     
-        print('epoch: {}'.format(epoch+1))
+        print('epoch: {}'.format(epoch))
         print('tr_loss: {}'.format(train_loss.item() / train_len))
         
         # test(val)
         if epoch % 10 == 0:
-            test_pred = gp2s(gyro_data=test_dataset.x, skel_data=test_dataset.y, model=net, batch_size=args.batch_size, gpu_ids=args.gpu_ids)
+            test_pred = gp2s(gyro_data=test_dataset.x, skel_data=test_dataset.y, seq_len=args.seq_len, 
+                    model_type=args.model, model=net, batch_size=args.batch_size, gpu_ids=args.gpu_ids)
    
     # Save Model
     print('Save Model ...')
     model_dir = 'logs'
-    model_file = 'gp2s_b{}_e{}_lr{}_{}.pt'.format(args.batch_size, args.epochs, 
-            str(args.learning_rate).replace('.','_'), args.loss)
+    model_file = 'gp2s_{}_n{}_b{}_e{}_lr{}_s{}_{}.pt'.format(args.model, args.n_layers, args.batch_size,
+            args.epochs, str(args.learning_rate).replace('.','_'), args.seq_len, args.loss)
     model_path = os.path.join(model_dir, model_file)
     torch.save(net.state_dict(), model_path)
     print(model_path, 'Saved.')
     
 
     # Test (Prediction)
-    test_pred = gp2s(gyro_data=test_dataset.x, skel_data=test_dataset.y, model_dir=model_dir, 
-            model_file=model_file, batch_size=args.batch_size, gpu_ids=args.gpu_ids)
+    test_pred = gp2s(gyro_data=test_dataset.x, skel_data=test_dataset.y, seq_len=args.seq_len, model_type=args.model,
+            model_dir=model_dir, model_file=model_file, batch_size=args.batch_size, gpu_ids=args.gpu_ids)
     test_pred = torch.Tensor(test_pred)
 
     # Save Logs
