@@ -27,7 +27,7 @@ if __name__=="__main__":
     parser.add_argument('-e', '--epochs', default=500, type=int, metavar='NAME', help='Number of Epochs')
     parser.add_argument('-b', '--batch_size', default=1, type=int, metavar='NAME', help='Batch Size')
     parser.add_argument('-l', '--loss', default='mse', type=str, metavar='NAME', help='Type of Loss Function')
-    parser.add_argument('-m', '--model', default='lstm', type=str, metavar='NAME', help='Type of Model')
+    parser.add_argument('-m', '--model', default='linear', type=str, metavar='NAME', help='Type of Model')
     parser.add_argument('-gpu', '--gpu_ids', default=0, type=int, metavar='NAME', help='GPU Numbers')
     args = parser.parse_args()
 
@@ -67,10 +67,9 @@ if __name__=="__main__":
     #optim = torch.optim.Adam(net.parameters(), lr=lr)
     optim = torch.optim.AdamW(net.parameters(), lr=lr)
     
-    net.train()
-    
     # train
-    for epoch in range(epochs):
+    for epoch in range(1, epochs+1):
+        net.train()
         train_loss = 0
         train_len = 0
         for x, y in train_loader:
@@ -92,22 +91,25 @@ if __name__=="__main__":
             train_loss += loss
             train_len += len(x)
     
-        print('epoch: {}'.format(epoch+1))
+        print('epoch: {}'.format(epoch))
         print('tr_loss: {}'.format(train_loss.item() / train_len))
    
 
     print('Save Model ...')
     model_dir = 'logs'
-    model_file = 'orthotics.pt'
+    model_file = 'orthotics_{}_b{}_e{}_lr{}_{}.pt'.format(args.model, 
+            args.batch_size, args.epochs, str(args.learning_rate).replace('.','_'), args.loss)
     model_path = os.path.join(model_dir, model_file)
     torch.save(net.state_dict(), model_path)
     print(model_path, 'Saved.')  
    
     # Test (Prediction)
     print(test_dataset.y.size())
-    left=0
-    right = 0
-    test_pred = orthotics(gyro_data=test_dataset.x, skel_data=test_dataset.y, model_dir=model_dir, 
-            model_file=model_file, batch_size=args.batch_size, gpu_ids=args.gpu_ids)
+    test_y = test_dataset.y.view(-1, orthotic_height*2, orthotic_width)
+    left = test_dataset.y[:, :orthotic_height]
+    right = test_dataset.y[:, orthotic_height:] 
+
+    test_pred = orthotics(gyro_data=test_dataset.x, orthotic_left=left, orthotic_right=right, model_type=args.model,
+            model_dir=model_dir, model_file=model_file, batch_size=args.batch_size, gpu_ids=args.gpu_ids)
     test_pred = torch.Tensor(test_pred)
          
