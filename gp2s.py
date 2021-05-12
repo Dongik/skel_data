@@ -1,5 +1,8 @@
 import pandas as pd
+import numpy as np
 import os
+import random
+import time
 import argparse
 
 import torch
@@ -15,19 +18,29 @@ from models.lstm import LSTMRegressor
 
 from inference import gp2s
 
+# Remove randomness
+random_seed = 42
+torch.manual_seed(random_seed)
+torch.cuda.manual_seed(random_seed)
+torch.cuda.manual_seed_all(random_seed)
+#torch.backends.cudnn.deterministic = True # Calc speed decreasing issue
+torch.backends.cudnn.benchmark = False
+np.random.seed(random_seed)
+random.seed(random_seed)
+
 num_gyro = 44
 num_skel = 51 
 
 if __name__=="__main__":
-
+    
     parser = argparse.ArgumentParser()
     parser.add_argument('-lr', '--learning_rate', default=0.0001, type=float, metavar='NAME', help='Learning Rate')
-    parser.add_argument('-e', '--epochs', default=300, type=int, metavar='NAME', help='Number of Epochs')
-    parser.add_argument('-b', '--batch_size', default=1024, type=int, metavar='NAME', help='Batch Size')
+    parser.add_argument('-e', '--epochs', default=100, type=int, metavar='NAME', help='Number of Epochs')
+    parser.add_argument('-b', '--batch_size', default=512, type=int, metavar='NAME', help='Batch Size')
     parser.add_argument('-l', '--loss', default='mse', type=str, metavar='NAME', help='Type of Loss Function')
     parser.add_argument('-m', '--model', default='linear', type=str, metavar='NAME', help='Type of Model')
-    parser.add_argument('-s', '--seq_len', default=200, type=int, metavar='NAME', help='Sequence Length of LSTM')
-    parser.add_argument('-n', '--n_layers', default=6, type=int, metavar='NAME', help='A number of Layers of LSTM')
+    parser.add_argument('-s', '--seq_len', default=64, type=int, metavar='NAME', help='Sequence Length of LSTM')
+    parser.add_argument('-n', '--n_layers', default=2, type=int, metavar='NAME', help='A number of Layers of LSTM')
     parser.add_argument('-gpu', '--gpu_ids', default=0, type=int, metavar='NAME', help='GPU Numbers')
     args = parser.parse_args()
 
@@ -35,20 +48,21 @@ if __name__=="__main__":
     #    torchvision.transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5)))
     tr = None
 
+    # Record Time
+    start_time = time.time()
 
     # DATASETS
     #data_name = 'skeleton_stop_walk_repeat.csv'
     if args.model == 'linear':
         train_dataset = SkelDataset(train=True, transform=tr)
-        test_dataset = SkelDataset(train=False, transform=tr)
+        test_dataset = SkelDataset(train=False, transform=tr) 
+
     elif args.model == 'lstm':
         train_dataset = SkelSeqDataset(train=True, seq_len=args.seq_len, transform=tr)
         test_dataset = SkelSeqDataset(train=False, seq_len=args.seq_len, transform=tr)
-
-    train_loader = DataLoader(dataset=train_dataset,
-         batch_size=args.batch_size,
-         shuffle=True,
-         num_workers=32)
+        
+    train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size,
+                            shuffle=False, num_workers=torch.get_num_threads())
 
     # Training Parameters
     device = torch.device('cuda:{}'.format(args.gpu_ids)) if torch.cuda.is_available() else torch.device('cpu') 
@@ -59,7 +73,7 @@ if __name__=="__main__":
     if args.model == 'linear':
         net = LinearRegressor(num_gyro, num_skel).to(device)
     elif args.model == 'lstm':
-        net = LSTMRegressor(num_gyro, num_skel, num_layers=args.n_layers, mult_pred=True).to(device)
+        net = LSTMRegressor(num_gyro, num_skel, num_layers=args.n_layers).to(device)
 
     args.loss = args.loss.lower()
     if args.loss == 'rmse':
@@ -77,7 +91,10 @@ if __name__=="__main__":
 
     #optim = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9)
     optim = torch.optim.Adam(net.parameters(), lr=lr)
-     
+    
+    # Record Time
+    initialize_time = time.time()
+
     # train
     for epoch in range(1, epochs+1):
         net.train()
@@ -108,8 +125,15 @@ if __name__=="__main__":
         # test(val)
         if epoch % 10 == 0:
             test_pred = gp2s(gyro_data=test_dataset.x, skel_data=test_dataset.y, seq_len=args.seq_len, 
-                    model_type=args.model, model=net, batch_size=args.batch_size, gpu_ids=args.gpu_ids)
-   
+                    model_type=args.model, model=net, batch_size=args.batch_size, n_layers=args.n_layers, gpu_ids=args.gpu_ids)
+    
+    # Records Time
+    end_time = time.time()
+    train_elapsed = end_time - initialize_time
+    initial_elapsed = initialize_time - start_time
+    print('Initializing Time: %dm %.2fs' % (initial_elapsed // 60, initial_elapsed % 60))
+    print('Training Time: %dm %.2fs' % (train_elapsed // 60, train_elapsed % 60))
+
     # Save Model
     print('Save Model ...')
     model_dir = 'logs'
@@ -122,7 +146,7 @@ if __name__=="__main__":
 
     # Test (Prediction)
     test_pred = gp2s(gyro_data=test_dataset.x, skel_data=test_dataset.y, seq_len=args.seq_len, model_type=args.model,
-            model_dir=model_dir, model_file=model_file, batch_size=args.batch_size, gpu_ids=args.gpu_ids)
+            model_dir=model_dir, model_file=model_file, batch_size=args.batch_size, n_layers=args.n_layers, gpu_ids=args.gpu_ids)
     test_pred = torch.Tensor(test_pred)
 
     # Save Logs

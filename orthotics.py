@@ -1,6 +1,9 @@
 import pandas as pd
+import numpy as np
 import os
 import argparse
+import time
+import random
 
 import torch
 from torch import nn
@@ -14,6 +17,16 @@ from models.linear import LinearRegressor
 from models.lstm import LSTMRegressor
 
 from inference import orthotics
+
+# Remove randomness
+random_seed = 42
+torch.manual_seed(random_seed)
+torch.cuda.manual_seed(random_seed)
+torch.cuda.manual_seed_all(random_seed)
+#torch.backends.cudnn.deterministic = True # Calc speed decreasing issue
+torch.backends.cudnn.benchmark = False
+np.random.seed(random_seed)
+random.seed(random_seed)
 
 num_gyro = 44
 orthotic_height = 30
@@ -34,16 +47,17 @@ if __name__=="__main__":
     #tr = torch.nn.Sequential(
     #    torchvision.transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5)))
     tr = None
+    
+    # Record Time
+    start_time = time.time()
 
     # DATASETS
     #data_name = 'skeleton_stop_walk_repeat.csv'    
     train_dataset = OrthoticDataset(train=True, transform=tr)
     test_dataset = OrthoticDataset(train=False, transform=tr)
     
-    train_loader = DataLoader(dataset=train_dataset,
-         batch_size=args.batch_size,
-         shuffle=False,
-         num_workers=32)
+    train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size,
+         shuffle=False, num_workers=get_num_threads())
 
     # Training Parameters
     device = torch.device('cuda:{}'.format(args.gpu_ids)) if torch.cuda.is_available() else torch.device('cpu') 
@@ -67,6 +81,9 @@ if __name__=="__main__":
     #optim = torch.optim.Adam(net.parameters(), lr=lr)
     optim = torch.optim.AdamW(net.parameters(), lr=lr)
     
+    # Record Time
+    initialize_time = time.time() 
+
     # train
     for epoch in range(1, epochs+1):
         net.train()
@@ -93,8 +110,15 @@ if __name__=="__main__":
     
         print('epoch: {}'.format(epoch))
         print('tr_loss: {}'.format(train_loss.item() / train_len))
-   
+    
+    # Records Time
+    end_time = time.time()
+    train_elapsed = end_time - initialize_time
+    initial_elapsed = initialize_time - start_time
+    print('Initializing Time: %dm %.2fs' % (initial_elapsed // 60, initial_elapsed % 60))
+    print('Training Time: %dm %.2fs' % (train_elapsed // 60, train_elapsed % 60))
 
+    # Save Model
     print('Save Model ...')
     model_dir = 'logs'
     model_file = 'orthotics_{}_b{}_e{}_lr{}_{}.pt'.format(args.model, 
