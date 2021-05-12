@@ -1,3 +1,6 @@
+
+
+
 import torch
 from models.linear import LinearRegressor
 from models.lstm import LSTMRegressor
@@ -55,8 +58,65 @@ class SkelInferer:
             s = y.cpu().numpy()
             return s
 
+def make_orthotics(data, base_dir="", model_file='orthotics_lstm_b1_e400_lr0_0002_mse.pt', save_dir="static/orthotics.csv"):
+    left, right = orthotics(gyro_data=data, model_type='lstm', model_file=model_file)
+    left, right = left[0], right[0]
+
+    mask = cv2.imread(os.path.join(base_dir, "mask.png"))
+    mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+    # cv2.imshow("mask", mask)
+
+    mid = np.zeros((orthotic_height, orthotic_height - orthotic_width * 2), dtype=np.int32)
+
+    print("l.s = {}, r.s = {}, m.s = {}".format(left.shape, right.shape, mid.shape))
+    pair = np.hstack([left, mid, right])
+    pair = pair.astype(np.uint8)
+    
+    r_max = np.amax(pair, axis=1)
+    print(r_max)
+
+    print("p.s = {}".format(pair.shape))
+    for i in range(pair.shape[0]):
+        for j in range(pair.shape[1]):
+            if pair[i][j] < 50:
+                pair[i][j] = r_max[i]
+            
+    # pair = pair.astype(np.uint8)
+
+    # cv2.imshow("pair", pair)
+    # print(pair)
+    # print("p.s = {}".format(pair.shape))
+
+    # pair = pair.astype(np.uint8)
+    pair = cv2.resize(pair, dsize=(300, 300), interpolation=cv2.INTER_AREA)
+
+
+    ks = 15
+    rks = ks * 2 + 1
+    pair = cv2.GaussianBlur(pair,(rks, rks),0)
+    
+    pair = cv2.bitwise_and(pair, mask)
+
+    padding = np.zeros((330, 330))
+    padding[:]
+
+    pair = cv2.resize(pair, (100, 100))
+
+    # cv2.imshow("pair", pair)
+    # cv2.waitKey(0)
+
+    print("orthotics has been made!")
+    print("save as {}".format(save_dir))
+    
+    df = pd.DataFrame(pair)
+    df.to_csv(save_dir)
+    
+    return pair
+
+
+
 class OrthoticsInferer:
-    def __init__(self, gpu_ids=0, model_dir="logs/", model_file='orthotics_lstm_b1_e400_lr0_0002_mse.pt', seq_len=5000):
+    def __init__(self, seq_len=5000):
         print("load orthtics model")
         
         self.save_dir = "static/orthotics.csv"
@@ -66,36 +126,14 @@ class OrthoticsInferer:
         self.x_series = deque(maxlen=seq_len)
         self.seq_len = seq_len
         self.is_making = False
-        self.pbar = tqdm(total=seq_len)
+        # self.pbar = tqdm(total=seq_len)
         print("orthtics model loaded")
 
     def make_orthotics(self):
         self.is_making = True
         gyro_data = np.array(self.x_series)
-        gdf = pd.DataFrame(gyro_data)
-        gdf.to_csv("sample_gyro_data.csv")
-
         self.x_series.clear()
-
-        left, right = orthotics(gyro_data=gyro_data, model_type='lstm', model_file='orthotics_lstm_b1_e400_lr0_0002_mse.pt')
-        left, right = left[0], right[0]
-
-        mid = np.zeros((orthotic_height, orthotic_height - orthotic_width * 2), dtype=np.int32)
-        
-        print("l.s = {}, r.s = {}, m.s = {}".format(left.shape, right.shape, mid.shape))
-        pair = np.hstack([left, mid, right])
-        print("p.s = {}".format(pair.shape))
-
-        pair = pair.astype(np.uint8)
-        pair = cv2.resize(pair, dsize=(100, 100), interpolation=cv2.INTER_AREA)
-        ks = 5
-        rks = ks * 2 + 1
-        pair = cv2.GaussianBlur(pair,(rks, rks),0)
-        
-        print("orthotics has been made!")
-        print("save as {}".format(self.save_dir))
-        df = pd.DataFrame(pair)
-        df.to_csv(self.save_dir)
+        pair = make_orthotics(gyro_data,base_dir="skel_data", save_dir=self.save_dir)
         self.is_making = False
         return pair
         # return left, right
@@ -104,28 +142,35 @@ class OrthoticsInferer:
         # print("feed {}, is made = {}".format(foot, self.is_made))
         
         self.x_series.append(foot)
-        self.pbar.update(1)
+        print("feed skel_data {}/{}".format(len(self.x_series),self.seq_len))
         
         if len(self.x_series) == self.seq_len and self.is_making:
-            self.pbar.close()
-            self.pbar = tqdm(total=self.seq_len)
-            # Thread(target=self.make_orthotics).start()
             self.make_orthotics()
         
 if __name__ == "__main__":
 
-    df = pd.read_csv("skeleton_data/skeleton_walking.csv")
+    df = pd.read_csv("sample_gyro_data.csv")
+    print("s.s = {}".format(df.shape))
     s = df.iloc[:,1:45].values
-    pivot = s.shape[0] // 2
+    print("s.s = {}".format(s.shape))
+    
+    make_orthotics(s, save_dir="../static/orthotics.csv")
+
+    
+    # pivot = s.shape[0] // 2
     
 
-    inferer = OrthoticsInferer()
+    # inferer = OrthoticsInferer()
+    
 
-    for i in np.r_[pivot: pivot + 6000]:
-        inferer.feed(s[i])
+    # for i in np.r_[:5000]:
+    #     inferer.feed(s[i])
 
-    pair = inferer.make_orthotics()
-    cv2.imshow("pair", pair)
-    cv2.waitKey(0)
+    # pair = inferer.make_orthotics()
+    
+    
+    
+    # cv2.imshow("pair", pair)
+    # cv2.waitKey(0)
 
 
