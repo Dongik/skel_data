@@ -34,40 +34,6 @@ class Skel:
         return np.array(b).swapaxes(0, -1)
 
 
-class DatasetReader:
-    def __init__(self, csv_dir):
-        self.csv_dir = csv_dir
-        df = pd.read_csv(csv_dir)
-        self.df = df
-
-    @property
-    def pressure(self):
-        pn = 16
-        lps = self.df.columns.get_loc("left.forces.0")
-        rps = self.df.columns.get_loc("right.forces.0")
-        return self.df.iloc[:, pd.np.r_[lps:lps + pn, rps: rps + pn]].values
-
-    @property
-    def gyro(self):
-        gn = 6
-        lgs = self.df.columns.get_loc("left.ang.x")
-        rgs = self.df.columns.get_loc("right.ang.x")
-        return self.df.iloc[:, pd.np.r_[lgs:lgs + gn, rgs:rgs + gn]].values
-    
-    @property
-    def skeleton(self):
-        sn = 3 * 17
-        ss = self.df.columns.get_loc("0.x")
-        return self.df.iloc[:, ss:ss + sn].values
-
-
-def load_dataset(csv_dir="skeleton_data/keep_walk.csv"):
-    return DatasetReader(csv_dir)
-
-
-    
-
-
 
 def png2csv(input_dir, output_size=(10, 30)):
     import cv2
@@ -198,7 +164,6 @@ def transform():
     transform.RotateWXYZ(45,0,1,0)
 
 
-
 def read_stl(filename="original_right.stl"):
     reader = vtk.vtkSTLReader()
     reader.SetFileName(filename)
@@ -240,6 +205,10 @@ def normalize_skel():
     for ji in range(joint_num):
         for a in axises:
             cols.append("s.{}.{}".format(ji, a))
+    
+    new_skel_folder_name = "skeleton_data_v2"
+    if not os.path.isdir(new_skel_folder_name):
+        os.mkdir(new_skel_folder_name)
 
     for skel_dir in tqdm(glob.glob("skeleton_data/*.csv")):
         
@@ -260,10 +229,12 @@ def normalize_skel():
         lf = s[:, joint_names.index("left_ankle")]
         rf = s[:, joint_names.index("right_ankle")]
         
-        g = np.minimum(lf[:,2], rf[:,2])
-        c = (lf[:,:2] - rf[:,:2]) / 2
-        print("g.s = {}, c.s = {}".format(g.shape, c.shape))
-        gc = np.hstack([c, g]) 
+        g = np.minimum(lf[:,2:], rf[:,2:]) - 0.5
+        # c = (lf[:,:2] + rf[:,:2]) / 2
+        # print("g.s = {}, c.s = {}".format(g.shape, c.shape))
+        
+
+        gc = np.hstack([p[:,:2], g]) 
         
         sl = np.sqrt(np.sum((p - sp) ** 2, axis=1))
 
