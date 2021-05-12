@@ -26,17 +26,15 @@ seq_len = 5000
 #   1. model: get model from memory
 #   2. model_dir, model_file: Load model from file path
 # Return predicted skeleton: Numpy array(data_num x 51)
-def gp2s(gyro_data=None, skel_data=None, model=None, seq_len=1, model_dir='logs/', model_type='linear', model_file='gp2s.pt', batch_size=512, gpu_ids=0, plot_skel=False):
+def gp2s(gyro_data=None, skel_data=None, model=None, seq_len=1, model_dir='logs/', model_type='linear', model_file='gp2s.pt', batch_size=512, n_layers=6, gpu_ids=0, plot_skel=False):
 
     if model_type == 'linear':
         test_dataset = SkelDataset(train=False, data_x=gyro_data, data_y=skel_data)
     elif model_type == 'lstm':
         test_dataset = SkelSeqDataset(train=False, seq_len=seq_len, data_x=gyro_data, data_y=skel_data)
     
-    test_loader = DataLoader(dataset=test_dataset,
-         batch_size=batch_size,
-         shuffle=False,
-         num_workers=32)
+    test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size,
+         shuffle=False, num_workers=torch.get_num_threads())
 
     # Device
     device = torch.device('cuda:{}'.format(gpu_ids)) if torch.cuda.is_available() else torch.device('cpu') 
@@ -52,7 +50,7 @@ def gp2s(gyro_data=None, skel_data=None, model=None, seq_len=1, model_dir='logs/
         if model_type == 'linear':
             net = LinearRegressor(num_gyro, num_skel)
         elif model_type == 'lstm':
-            net = LSTMRegressor(num_gyro, num_skel, mult_pred=True)
+            net = LSTMRegressor(num_gyro, num_skel, num_layers=n_layers)
         net.load_state_dict(torch.load(os.path.join(model_dir, model_file)))
         net = net.to(device)
 
@@ -82,8 +80,8 @@ def gp2s(gyro_data=None, skel_data=None, model=None, seq_len=1, model_dir='logs/
             
             # Concat predictions
             pred = pred.cpu()
-            if model_type == 'lstm':
-                pred = pred.reshape(pred.size(0)*pred.size(1), pred.size(2))
+            #if model_type == 'lstm':
+            #    pred = pred.reshape(pred.size(0)*pred.size(1), pred.size(2))
             test_pred = torch.cat([test_pred, pred])
     
     # Print loss when skeleton data exist
@@ -193,7 +191,7 @@ def orthotics(gyro_data=None, orthotic_left=None, orthotic_right=None, model_typ
 
     return left.numpy(), right.numpy()
 
-def test_gp2s(csv_dir='skeleton_data', csv_file='keep_walk.csv', seq_len=200, model_type='linear', model_file='gp2s.pt'):
+def test_gp2s(csv_dir='skeleton_data', csv_file='keep_walk.csv', seq_len=200, n_layers=6, model_type='linear', model_file='gp2s.pt'):
     df = pd.read_csv(os.path.join(csv_dir, csv_file), index_col=0)
     x = np.array(df.iloc[:,:44].values)
     y = np.array(df.iloc[:,44:].values)
@@ -201,7 +199,7 @@ def test_gp2s(csv_dir='skeleton_data', csv_file='keep_walk.csv', seq_len=200, mo
     pivot = int(len(y) * 0.8)
     x, y = x[pivot:], y[pivot:]
           
-    pred = gp2s(gyro_data=x, skel_data=y, model_type=model_type, seq_len=seq_len, model_file=model_file, plot_skel=True)
+    pred = gp2s(gyro_data=x, skel_data=y, model_type=model_type, seq_len=seq_len, n_layers=n_layers, model_file=model_file, plot_skel=True)
     return pred
 
 def test_infer_orthotics(model_type='linear', model_file='orthotics.pt'):

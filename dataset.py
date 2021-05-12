@@ -14,7 +14,63 @@ orthotic_train_num = 5000 # must be even
 
 # x: foot pressure, y: skel
 class SkelDataset(Dataset):
-    def __init__(self, train=True, data_x = None, data_y = None, csv_dir='skeleton_data', csv_file=None, train_ratio=0.8, transform=None):
+    def __init__(self, train=True, data_x = None, data_y = None, csv_dir='skeleton_data', csv_file=None, train_ratio=0.8, transform=None): 
+        self.transform = transform
+        # data array exist
+        if data_x is not None:
+            self.x = torch.Tensor(data_x)
+            if data_y is not None:
+                self.y = torch.Tensor(data_y)
+            else:
+                self.y = torch.zeros(len(data_x), num_skel)
+        
+        # Read csv file
+        else:
+            # Read whole directory
+            if csv_file is None:
+                files = glob.glob(os.path.join(csv_dir, '*.csv'))
+            # Read specific csv file
+            else:
+                files = [os.path.join(csv_dir, csv_file)]
+            
+            x, y = [], [] 
+            for file_name in files:
+                # read file
+                print('read file {}'.format(file_name))
+                df = pd.read_csv(file_name, index_col=0)
+
+                # split dataset (each file)
+                pivot = int(len(df) * train_ratio)
+                if train:
+                    x_, y_ = df.iloc[:pivot, :44], df.iloc[:pivot, 44:]
+                else:
+                    x_, y_ = df.iloc[pivot:, :44], df.iloc[pivot:, 44:]
+                x.append(torch.Tensor(x_.values))
+                y.append(torch.Tensor(y_.values))
+
+            # concat to one tensor 
+            self.x, self.y = torch.cat(x, dim=0), torch.cat(y, dim=0) 
+
+        print("X:", self.x.size())
+        print("Y:", self.y.size())
+        
+    def __len__(self):
+        return self.y.size(0)
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        return self.x[idx], self.y[idx]
+
+
+# x: foot pressure, y: skel
+class SkelSeqDataset(Dataset):
+    def __init__(self, train=True, data_x = None, data_y = None, seq_len=100, stride=1, csv_dir='skeleton_data', csv_file=None, train_ratio=0.8, transform=None): 
+        self.transform = transform
+        self.seq_len = seq_len
+        self.stride = stride
+
         # data array exist
         if data_x is not None:
             self.x = torch.Tensor(data_x)
@@ -53,27 +109,32 @@ class SkelDataset(Dataset):
         print("X:", self.x.size())
         print("Y:", self.y.size())
 
-        self.transform = transform
-        
     def __len__(self):
-        return self.y.size(0)
+        return (self.y.size(0) - self.seq_len) // self.stride
 
     def __getitem__(self, idx):
-        if torch.is_tensor(idx):
-            idx = idx.tolist()
+        #if torch.is_tensor(idx):
+        #    idx = idx.tolist()
+        x = self.x[self.stride * idx : self.stride * idx + self.seq_len]
+        y = self.y[self.stride * idx + self.seq_len]
 
-        return self.x[idx], self.y[idx]
+        return x, y
 
+'''
 # x: foot pressure, y: skel
 class SkelSeqDataset(Dataset):
-    def __init__(self, train=True, data_x = None, data_y = None, seq_len=200, csv_dir='skeleton_data', csv_file=None, train_ratio=0.8, transform=None):
+    def __init__(self, train=True, data_x = None, data_y = None, seq_len=100, stride=1, csv_dir='skeleton_data', csv_file=None, train_ratio=0.8, transform=None):
+        self.seq_len = seq_len
+        self.stride = stride
+        self.transform = transform
+
         # data array exist
         if data_x is not None:
-            self.x = torch.Tensor(data_x)  
+            x = torch.Tensor(data_x)  
             if data_y is not None:
-                self.y = torch.Tensor(data_y) 
+                y = torch.Tensor(data_y) 
             else:
-                self.y = torch.zeros(len(data_x) // seq_len, seq_len, num_skel)
+                y = torch.zeros(len(data_x) // seq_len, seq_len, num_skel)
         
         # Read csv file
         else:
@@ -93,31 +154,45 @@ class SkelSeqDataset(Dataset):
                 # split dataset (each file)
                 pivot = int(len(df) * train_ratio)
                 if train:
-                    df_ = df.iloc[:pivot-(pivot%seq_len)]
+                    df_ = df.iloc[:pivot]
                 else:
                     df_ = df.iloc[pivot:]
-                    df_ = df_.iloc[:len(df_)-(len(df_)%seq_len)] 
+                    #df_ = df_.iloc[:len(df_)-(len(df_)%self.seq_len)] 
                  
                 x.append(torch.Tensor(df_.iloc[:, :44].values))
                 y.append(torch.Tensor(df_.iloc[:, 44:].values))
             # concat to one tensor 
-            self.x, self.y = torch.cat(x, dim=0), torch.cat(y, dim=0) 
-        
-        # reshape by seq_len
-        if len(self.x.size()) < 3:
-            pivot = self.x.size(0) % seq_len
-            self.x = self.x[:self.x.size(0)-pivot]
-            self.x = self.x.reshape(self.x.size(0) // seq_len, seq_len, self.x.size(1))
-        if len(self.y.size()) < 3:
-            pivot = self.y.size(0) % seq_len
-            self.y = self.y[:self.y.size(0)-pivot]
-            self.y = self.y.reshape(self.y.size(0) // seq_len, seq_len, self.y.size(1))
-        print("X:", self.x.size())
-        print("Y:", self.y.size())
+            x, y = torch.cat(x, dim=0), torch.cat(y, dim=0) 
+            
+        # reshape into sequential data
+        self.x, self.y = self.reshape_data(x, y)
 
-        self.seq_len = seq_len
-        self.transform = transform
-        
+        print("X:", self.x.size())
+        print("Y:", self.y.size()) 
+    
+    def reshape_data(self, x, y):
+        if not torch.is_tensor(x) or not torch.is_tensor(y):
+            x = torch.Tensor(x)
+            y = torch.Tensor(y)
+        # reshape by seq_len
+        if len(x.size()) < 3:
+            #pivot = x.size(0) % self.seq_len
+            #x = x[:x.size(0)-pivot]
+            ret_x = torch.zeros((x.size(0)-self.seq_len)//self.stride, self.seq_len, x.size(1))
+            for i in range(0, len(ret_x), self.stride):
+                ret_x[i] = x[i : i+self.seq_len]
+            #x = x.reshape(x.size(0) // self.seq_len, self.seq_len, x.size(1))
+        else:
+            ret_x = x
+
+        if len(y.size()) < 3:
+            ret_y = y[torch.arange(self.seq_len, y.size(0), self.stride)]
+            #y = y.reshape(y.size(0) // seq_len, seq_len, y.size(1))
+        else:
+            ret_y = y
+    
+        return ret_x, ret_y
+
     def __len__(self):
         return self.y.size(0)
 
@@ -126,10 +201,12 @@ class SkelSeqDataset(Dataset):
             idx = idx.tolist()
 
         return self.x[idx], self.y[idx]
+'''
 
 # x: foot pressure, y: orthotics(left&right)
 class OrthoticDataset(Dataset):
     def __init__(self, train=True, data_x = None, data_y = None, data_dir='orthotics_data', train_ratio=0.8, transform=None):
+        self.transform = transform    
         # data array exist
         if data_x is not None:
             self.x = torch.Tensor(data_x) 
@@ -154,7 +231,6 @@ class OrthoticDataset(Dataset):
         print("X:", self.x.size())
         print("Y:", self.y.size())
 
-        self.transform = transform
         # Normalize RGB Value(0~255)
         self.y = self.y / 256
 
