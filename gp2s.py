@@ -16,7 +16,7 @@ from dataset import SkelDataset, SkelSeqDataset
 from models.linear import LinearRegressor
 from models.lstm import LSTMRegressor
 
-from inference import gp2s
+from inference import gp2s, Inference
 
 # Remove randomness
 random_seed = 42
@@ -76,6 +76,10 @@ if __name__=="__main__":
     elif args.model == 'lstm':
         net = LSTMRegressor(num_gyro, num_skel, num_layers=args.n_layers).to(device)
 
+    # Test Inference
+    test_infer = Inference(infer_type='gp2s', model=net, model_type=args.model, batch_size=args.batch_size,
+                        n_layers=args.n_layers, seq_len=args.seq_len, loss=args.loss, gpu_ids=args.gpu_ids)
+
     args.loss = args.loss.lower()
     if args.loss == 'rmse':
         class RMSELoss(nn.Module):
@@ -125,8 +129,9 @@ if __name__=="__main__":
         
         # test(val)
         if epoch % 10 == 0:
-            test_pred = gp2s(gyro_data=test_dataset.x, skel_data=test_dataset.y, seq_len=args.seq_len, 
-                    model_type=args.model, model=net, batch_size=args.batch_size, n_layers=args.n_layers, gpu_ids=args.gpu_ids)
+            test_pred = test_infer.infer(gyro_data=test_dataset.x, skel_data=test_dataset.y)
+            #test_pred = gp2s(gyro_data=test_dataset.x, skel_data=test_dataset.y, seq_len=args.seq_len, 
+            #        model_type=args.model, model=net, batch_size=args.batch_size, n_layers=args.n_layers, gpu_ids=args.gpu_ids)
     
     # Records Time
     end_time = time.time()
@@ -146,8 +151,9 @@ if __name__=="__main__":
     
 
     # Test (Prediction)
-    test_pred = gp2s(gyro_data=test_dataset.x, skel_data=test_dataset.y, seq_len=args.seq_len, model_type=args.model,
-            model_dir=model_dir, model_file=model_file, batch_size=args.batch_size, n_layers=args.n_layers, gpu_ids=args.gpu_ids)
+    test_pred = test_infer.infer(gyro_data=test_dataset.x, skel_data=test_dataset.y)
+    #test_pred = gp2s(gyro_data=test_dataset.x, skel_data=test_dataset.y, seq_len=args.seq_len, model_type=args.model,
+    #        model_dir=model_dir, model_file=model_file, batch_size=args.batch_size, n_layers=args.n_layers, gpu_ids=args.gpu_ids)
     test_pred = torch.Tensor(test_pred)
 
     # Save Logs
