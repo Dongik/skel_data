@@ -53,6 +53,7 @@ class SkelInferer:
         else:
             x = torch.Tensor(gp)
             x = x.to(self.device)
+            x = torch.unsqueeze(x, 0)
             with torch.no_grad():
                 y = self.net(x)
             s = y.cpu().numpy()
