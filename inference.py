@@ -345,7 +345,7 @@ if __name__=="__main__":
     for i in range(5):
         print('Inference #%d'%(i+1))
         # prepare data
-        data = np.zeros((1000, 44))
+        data = np.zeros((200, 44))
         # inference
         pred = gp2s.infer(gyro_data=data)
     

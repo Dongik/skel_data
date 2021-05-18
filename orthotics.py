@@ -40,7 +40,7 @@ if __name__=="__main__":
     parser.add_argument('-e', '--epochs', default=500, type=int, metavar='NAME', help='Number of Epochs')
     parser.add_argument('-b', '--batch_size', default=1, type=int, metavar='NAME', help='Batch Size')
     parser.add_argument('-l', '--loss', default='mse', type=str, metavar='NAME', help='Type of Loss Function')
-    parser.add_argument('-m', '--model', default='linear', type=str, metavar='NAME', help='Type of Model')
+    parser.add_argument('-m', '--model', default='lstm', type=str, metavar='NAME', help='Type of Model')
     parser.add_argument('-gpu', '--gpu_ids', default=0, type=int, metavar='NAME', help='GPU Numbers')
     args = parser.parse_args()
 
