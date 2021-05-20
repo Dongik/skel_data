@@ -51,8 +51,8 @@ class SkelDataset(Dataset):
             # concat to one tensor 
             self.x, self.y = torch.cat(x, dim=0), torch.cat(y, dim=0) 
 
-        print("X:", self.x.size())
-        print("Y:", self.y.size())
+        #print("X:", self.x.size())
+        #print("Y:", self.y.size())
         
     def __len__(self):
         return self.y.size(0)
@@ -106,8 +106,8 @@ class SkelSeqDataset(Dataset):
             # concat to one tensor 
             self.x, self.y = torch.cat(x, dim=0), torch.cat(y, dim=0) 
 
-        print("X:", self.x.size())
-        print("Y:", self.y.size())
+        #print("X:", self.x.size())
+        #print("Y:", self.y.size())
 
     def __len__(self):
         return (self.y.size(0) - self.seq_len) // self.stride
@@ -167,8 +167,8 @@ class SkelSeqDataset(Dataset):
         # reshape into sequential data
         self.x, self.y = self.reshape_data(x, y)
 
-        print("X:", self.x.size())
-        print("Y:", self.y.size()) 
+        #print("X:", self.x.size())
+        #print("Y:", self.y.size()) 
     
     def reshape_data(self, x, y):
         if not torch.is_tensor(x) or not torch.is_tensor(y):
@@ -228,8 +228,8 @@ class OrthoticDataset(Dataset):
                 self.x = self.x[pivot:]
                 self.y = self.y[pivot:]
 
-        print("X:", self.x.size())
-        print("Y:", self.y.size())
+        #print("X:", self.x.size())
+        #print("Y:", self.y.size())
 
         # Normalize RGB Value(0~255)
         self.y = self.y / 256
