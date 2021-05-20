@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
+import time
 
 import torch
 from torch import nn
@@ -50,6 +51,7 @@ class Inference:
                 self.net = LSTMRegressor(num_gyro, num_skel, num_layers=self.n_layers)
             self.net.load_state_dict(torch.load(os.path.join(model_dir, model_file)))
             self.net = self.net.to(self.device)
+            self.net.eval()
 
     def setAttr(self, batch_size=None, seq_len=None, gpu_ids=None, loss='None'):
         if batch_size is not None:
@@ -83,10 +85,10 @@ class Inference:
                 self.dataset = SkelSeqDataset(train=False, seq_len=self.seq_len, data_x=gyro_data, data_y=skel_data)
             
             self.dataloader = DataLoader(dataset=self.dataset, batch_size=self.batch_size,
-                 shuffle=False, num_workers=self.num_workers)  
-        
+                 shuffle=False, num_workers=0)  
+
         # Inference
-        self.net.eval()
+        #self.net.eval()
         with torch.no_grad():
             test_loss = 0
             test_len = 0 
@@ -95,7 +97,7 @@ class Inference:
             for x, y in self.dataloader:
                 batch_size = len(y)
                 x, y = x.to(self.device), y.to(self.device)
-                 
+                
                 if self.model_type == 'linear':
                     pred = self.net(x)
                 elif self.model_type == 'lstm':
@@ -106,8 +108,8 @@ class Inference:
                 if skel_data is not None:
                     loss = self.criterion(pred, y)
                     test_loss += loss
-                    test_len += len(x)
-            
+                    test_len += len(x) 
+
                 # Concat predictions
                 pred = pred.cpu()
                 #if model_type == 'lstm':
@@ -157,7 +159,7 @@ def gp2s(gyro_data=None, skel_data=None, model=None, seq_len=1, model_dir='logs/
         test_dataset = SkelSeqDataset(train=False, seq_len=seq_len, data_x=gyro_data, data_y=skel_data)
     
     test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size,
-         shuffle=False, num_workers=torch.get_num_threads())
+         shuffle=False, num_workers=0)
 
     # Device
     device = torch.device('cuda:{}'.format(gpu_ids)) if torch.cuda.is_available() else torch.device('cpu') 
@@ -252,7 +254,7 @@ def orthotics(gyro_data=None, orthotic_left=None, orthotic_right=None, model_typ
     test_loader = DataLoader(dataset=test_dataset,
          batch_size=batch_size,
          shuffle=False,
-         num_workers=32)
+         num_workers=0)
 
     # Device
     device = torch.device('cuda:{}'.format(gpu_ids)) if torch.cuda.is_available() else torch.device('cpu') 
@@ -341,11 +343,12 @@ def test_infer_orthotics(model_type='linear', model_file='orthotics.pt'):
 if __name__=="__main__":
     print('GP2Skel')
     # Initialize inference class
-    gp2s = Inference(infer_type='gp2s', model_type='lstm', batch_size=128, n_layers=8, seq_len=32, model_dir='logs', model_file='gp2s_lstm_e500_n8_b8192_lr0_0001_seq32_str5_mse.pt')
-    for i in range(5):
-        print('Inference #%d'%(i+1))
+    gp2s = Inference(infer_type='gp2s', model_type='lstm', batch_size=1, n_layers=8, seq_len=32, model_dir='logs', model_file='gp2s_lstm_e500_n8_b8192_lr0_0001_seq32_str5_mse.pt')
+
+    for i in range(200):
+        #print('Inference #%d'%(i+1))
         # prepare data
-        data = np.zeros((200, 44))
+        data = np.zeros((1, 44))
         # inference
         pred = gp2s.infer(gyro_data=data)
     
