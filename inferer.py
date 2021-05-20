@@ -6,6 +6,7 @@ from models.linear import LinearRegressor
 from models.lstm import LSTMRegressor
 from inference import orthotics
 import os
+from torch import nn
 
 import numpy as np
 import pandas as pd
@@ -22,6 +23,71 @@ orthotic_width = 10
 orthotic_height = 30
 import time
 
+class Inference:
+    def __init__(self, infer_type, model=None, model_type='lstm', model_dir='logs/', model_file='gp2s.pt', batch_size=512, n_layers=8, seq_len=32, loss='mse', gpu_ids=0):
+        self.infer_type = infer_type
+        self.model_type = model_type
+        self.model_dir = model_dir
+        self.model_file = model_file
+        self.batch_size = batch_size
+        self.n_layers = n_layers
+        self.seq_len = seq_len
+        self.loss = loss
+
+        self.data_seq = torch.zeros((32, 44))
+        
+        # Device
+        self.device = torch.device('cuda:{}'.format(gpu_ids)) if torch.cuda.is_available() else torch.device('cpu') 
+        self.num_workers = torch.get_num_threads()
+
+        # Loss
+        self.criterion = nn.MSELoss()
+        # Empty Dataset
+        self.dataset = None
+        self.extra_data = None
+        self.dataloader = None
+        # Load Model
+        if model is not None:
+            self.net = model.to(self.device)
+        else:
+            if self.model_type == 'linear':
+                self.net = LinearRegressor(num_gyro, num_skel)
+            elif self.model_type == 'lstm':
+                self.net = LSTMRegressor(num_gyro, num_skel, num_layers=self.n_layers)
+            self.net.load_state_dict(torch.load(os.path.join(model_dir, model_file)))
+            self.net = self.net.to(self.device)
+            self.net.eval()
+
+    def setAttr(self, batch_size=None, seq_len=None, gpu_ids=None, loss='None'):
+        if batch_size is not None:
+            self.batch_size = batch_size
+        if seq_len is not None:
+            self.seq_len = seq_len
+        if gpu_ids is not None:
+            self.gpu_ids = gpu_ids
+            self.device = torch.device('cuda:{}'.format(gpu_ids)) if torch.cuda.is_available() else torch.device('cpu') 
+
+    def infer(self, gyro_data):
+        print("g .s = {}".format(gyro_data.shape))
+        self.data_seq = torch.cat([self.data_seq, gyro_data])[-self.seq_len:,:]
+        
+        x = torch.unsqueeze(self.data_seq, 0)
+        with torch.no_grad():
+
+            batch_size = 1
+            x = x.to(self.device)
+                
+            if self.model_type == 'linear':
+                pred = self.net(x)
+            elif self.model_type == 'lstm':
+                hc = self.net.init_hidden_cell(batch_size)
+                pred, hc = self.net(x, hc)
+                print("pred.shape = {}".format(pred.shape))
+
+            pred = pred.cpu()
+    
+    
+            return pred.numpy()
 class SkelInferer:
     def __init__(self, gpu_ids=0, model_dir="logs/", model_file='gp2s_b1024_e300_lr0_0001_mse.pt', fake=False):
         self.fake = fake
