@@ -33,6 +33,7 @@ class Inference:
         self.n_layers = n_layers
         self.seq_len = seq_len
         self.loss = loss
+        self.flag = False
 
         self.data_seq = torch.zeros((32, 44))
         
@@ -68,26 +69,32 @@ class Inference:
             self.device = torch.device('cuda:{}'.format(gpu_ids)) if torch.cuda.is_available() else torch.device('cpu') 
 
     def infer(self, gyro_data):
-        print("g .s = {}".format(gyro_data.shape))
-        self.data_seq = torch.cat([self.data_seq, gyro_data])[-self.seq_len:,:]
+        if not self.flag:
+            self.flag = True
+            if not torch.is_tensor(gyro_data):
+                gyro_data = torch.Tensor(gyro_data)
+
+            self.data_seq = torch.cat([self.data_seq, gyro_data])[-self.seq_len:,:]
+            
+            x = torch.unsqueeze(self.data_seq, 0)
+            with torch.no_grad():
+
+                batch_size = 1
+                x = x.to(self.device)
+                    
+                if self.model_type == 'linear':
+                    pred = self.net(x)
+                elif self.model_type == 'lstm':
+                    hc = self.net.init_hidden_cell(batch_size)
+                    pred, hc = self.net(x, hc)
+                    print("pred.shape = {}".format(pred.shape))
+
+                pred = pred.cpu()
         
-        x = torch.unsqueeze(self.data_seq, 0)
-        with torch.no_grad():
-
-            batch_size = 1
-            x = x.to(self.device)
-                
-            if self.model_type == 'linear':
-                pred = self.net(x)
-            elif self.model_type == 'lstm':
-                hc = self.net.init_hidden_cell(batch_size)
-                pred, hc = self.net(x, hc)
-                print("pred.shape = {}".format(pred.shape))
-
-            pred = pred.cpu()
-    
-    
-            return pred.numpy()
+                self.flag = False
+                return pred.numpy()
+        else:
+            return None
 class SkelInferer:
     def __init__(self, gpu_ids=0, model_dir="logs/", model_file='gp2s_b1024_e300_lr0_0001_mse.pt', fake=False):
         self.fake = fake
