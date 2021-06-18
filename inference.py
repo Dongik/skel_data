@@ -254,7 +254,7 @@ def orthotics(gyro_data=None, orthotic_left=None, orthotic_right=None, model_typ
     test_loader = DataLoader(dataset=test_dataset,
          batch_size=batch_size,
          shuffle=False,
-         num_workers=0)
+         num_workers=0) 
 
     # Device
     device = torch.device('cuda:{}'.format(gpu_ids)) if torch.cuda.is_available() else torch.device('cpu') 
@@ -293,10 +293,12 @@ def orthotics(gyro_data=None, orthotic_left=None, orthotic_right=None, model_typ
                 pred, hc = net(x, hc)
             
             # Calc loss
+
             if data_y is not None:
                 loss = criterion(pred, y)
                 test_loss += loss
                 test_len += len(x)
+                #print(loss.item()) 
             
             # Concat predictions
             test_pred = torch.cat([test_pred, pred.cpu()])
@@ -319,7 +321,7 @@ def orthotics(gyro_data=None, orthotic_left=None, orthotic_right=None, model_typ
 def test_infer_orthotics(model_type='linear', model_file='orthotics.pt'):
     data = OrthoticDataset(train=True,train_ratio=1.0)
 
-    left, right = orthotics(gyro_data=data.x, model_type=model_type, model_file=model_file, batch_size=5)
+    left, right = orthotics(gyro_data=data.x, orthotic_left=data.y[:, orthotic_width*orthotic_height:], orthotic_right=data.y[:, :orthotic_width*orthotic_height], model_type=model_type, model_file=model_file, batch_size=1)
 
     fig = plt.figure() # rows*cols 행렬의 i번째 subplot 생성
     rows = len(data.x)
