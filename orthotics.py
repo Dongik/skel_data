@@ -57,7 +57,7 @@ if __name__=="__main__":
     test_dataset = OrthoticDataset(train=False, transform=tr)
     
     train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size,
-         shuffle=False, num_workers=get_num_threads())
+         shuffle=False, num_workers=0)
 
     # Training Parameters
     device = torch.device('cuda:{}'.format(args.gpu_ids)) if torch.cuda.is_available() else torch.device('cpu') 
@@ -104,7 +104,7 @@ if __name__=="__main__":
             loss.backward()
             optim.step()
             optim.zero_grad()
-    
+             
             train_loss += loss
             train_len += len(x)
     

@@ -232,7 +232,8 @@ class OrthoticDataset(Dataset):
         #print("Y:", self.y.size())
 
         # Normalize RGB Value(0~255)
-        self.y = self.y / 256
+        if (self.y >= 1).sum() > 0:
+            self.y = self.y / 256
 
     def __len__(self):
         return self.y.size(0)
