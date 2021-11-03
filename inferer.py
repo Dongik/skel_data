@@ -1,6 +1,7 @@
 
 
 
+from nn.torch_models import LSTM
 import torch
 from models.linear import LinearRegressor
 from models.lstm import LSTMRegressor
@@ -96,9 +97,10 @@ class Inference:
         else:
             return None
 class SkelInferer:
-    def __init__(self, gpu_ids=0, model_dir="logs/", model_file='gp2s_b1024_e300_lr0_0001_mse.pt', fake=False):
+    def __init__(self, gpu_ids=0, model_dir="logs/", model_file='gp2s_lstm_e500_n8_b1024_lr0_0001_seq32_str5_mse.pt', fake=False):
         self.fake = fake
         if self.fake:
+            print("use fake data")
             self.start_time = time.time()
             self.count = 0
             df = pd.read_csv("skel_data/skeleton_data/skeleton_walking.csv")
@@ -111,7 +113,13 @@ class SkelInferer:
 
             print("load skel model")
             device = torch.device('cuda:{}'.format(gpu_ids)) if torch.cuda.is_available() else torch.device('cpu') 
-            net = LinearRegressor(num_gyro, num_skel)
+
+            if 'lstm' in model_file:
+                num_layers = int(model_file.split("_")[3][1:])
+                net = LSTMRegressor(num_gyro, num_skel, num_layers=num_layers)
+            else:
+                net = LinearRegressor(num_gyro, num_skel)
+
             net.load_state_dict(torch.load(os.path.join(model_dir, model_file)))
             self.net = net.to(device)
             self.net.eval()
